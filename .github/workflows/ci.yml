@@ -1,0 +1,59 @@
+# Integração contínua: a cada push e pull request, roda tudo contra um PostgreSQL real.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fight
+          POSTGRES_PASSWORD: fight
+          POSTGRES_DB: fight_manager
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fight -d fight_manager"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://fight:fight@localhost:5432/fight_manager
+      TEST_DATABASE_URL: postgres://fight:fight@localhost:5432/fight_manager_test
+      E2E_DATABASE_URL: postgres://fight:fight@localhost:5432/fight_manager_e2e
+      APP_TIMEZONE: America/Sao_Paulo
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Criar bancos de teste
+        run: |
+          PGPASSWORD=fight psql -h localhost -U fight -d fight_manager -c "CREATE DATABASE fight_manager_test;"
+          PGPASSWORD=fight psql -h localhost -U fight -d fight_manager -c "CREATE DATABASE fight_manager_e2e;"
+      - run: npm ci
+      - name: Tipos
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Testes automatizados (regras de negócio, isolamento, concorrência)
+        run: npm test
+      - name: Build de produção
+        run: npm run build
+      - name: Navegador dos testes de ponta a ponta
+        run: npx playwright install --with-deps chromium
+      - name: Testes de ponta a ponta
+        run: npm run test:e2e
+      - name: Relatório dos testes de ponta a ponta
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

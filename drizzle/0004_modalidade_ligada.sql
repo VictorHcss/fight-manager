@@ -1,0 +1,3 @@
+ALTER TABLE "students" DROP CONSTRAINT "students_complete_when_approved";--> statement-breakpoint
+ALTER TABLE "students" DROP COLUMN "modality";--> statement-breakpoint
+ALTER TABLE "students" ADD CONSTRAINT "students_complete_when_approved" CHECK ("students"."status"::text in ('pending', 'rejected') or ("students"."modality_id" is not null and "students"."joined_at" is not null and "students"."monthly_fee_cents" is not null));

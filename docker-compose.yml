@@ -1,0 +1,44 @@
+# Ambiente local: PostgreSQL + aplicação. Ver docs/setup.md.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fight}
+      POSTGRES_DB: fight_manager
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fight -d fight_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://fight:${POSTGRES_PASSWORD:-fight}@db:5432/fight_manager
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
+      # localmente o acesso é por http://localhost; em produção, use HTTPS e remova esta linha
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # e-mail (ver docs/email.md): preencha no .env; vazio = e-mails só no log (docker compose logs app)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      # contas de teste na tela de login (o seed cria; ver README)
+      SHOW_TEST_ACCOUNTS: ${SHOW_TEST_ACCOUNTS:-true}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
