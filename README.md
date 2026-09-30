@@ -32,20 +32,6 @@ O fluxo principal de utilização é simples:
 
 O painel inicial reúne informações importantes para a rotina administrativa, como mensalidades atrasadas, solicitações de entrada, vencimentos próximos e resumo financeiro do mês.
 
-> **Demonstração visual**
->
-> Adicione aqui capturas de tela do sistema para que os visitantes possam conhecer a interface sem precisar executá-lo.
->
-> Sugestões de telas:
-> - Painel inicial
-> - Lista e perfil dos alunos
-> - Controle de mensalidades
-> - Registro de pagamentos
-> - Painel financeiro
-> - Área do aluno
->
-> Exemplo de organização sugerida: `docs/images/dashboard.png`.
-
 ---
 
 ## Funcionalidades
