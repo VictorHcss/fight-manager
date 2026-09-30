@@ -269,6 +269,4 @@ As funcionalidades planejadas e seu estado atual estão descritos no [roadmap](d
 
 ## Licença
 
-Este projeto está licenciado sob a licença MIT.
-
-**Desenvolvido por Victor H.**
+**MIT © Victor H.**
