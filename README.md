@@ -1,150 +1,288 @@
 # Fight Manager
 
-Gestão administrativa para academias de luta e artes marciais: alunos, mensalidades, pagamentos e um financeiro básico, num sistema web simples, rápido e responsivo.
+**Gestão de academias de luta e artes marciais, do cadastro de alunos ao controle financeiro.**
 
-**Situação:** MVP funcional (versão 0.7.0). Requisitos e estado de cada um em [docs/requisitos.md](docs/requisitos.md). Começou como projeto de portfólio, mas foi construído com PostgreSQL real, migrations, validações no servidor, testes, auditoria e isolamento entre academias, para poder evoluir para uso real.
+O Fight Manager é um sistema web para administrar academias de luta, centralizando alunos, mensalidades, pagamentos e informações financeiras em uma única plataforma.
 
-## O que o MVP faz
+O projeto começou como uma iniciativa de portfólio e evoluiu para um MVP funcional, com autenticação, PostgreSQL, controle de acesso por academia, auditoria e testes automatizados.
 
-O fluxo principal é: **pesquisar o aluno → abrir o perfil → ver a situação financeira → registrar o pagamento**.
+**Versão:** 0.7.0 · **Status:** MVP funcional · **Licença:** MIT
 
-- **Início:** primeiro o que pede ação (mensalidades atrasadas, solicitações de entrada, mensalidades a vencer), depois as pendências e o resumo financeiro do mês.
-- **Configuração da academia:** dados (nome, CPF/CNPJ, contato e endereço), **modalidades** com valor sugerido e **termos da ficha de matrícula**, tudo pela interface. No primeiro acesso, o Início mostra o que falta configurar.
-- **Alunos:** cadastro em seções (dados pessoais, matrícula, contato de emergência, uso de imagem e endereço), edição, pesquisa por nome, telefone, e-mail, CPF ou pelo nome e telefone do responsável, filtro por status, ativação e inativação. Cada aluno tem um **valor mensal** e um **dia de vencimento**, usados em todas as mensalidades futuras.
-- **Menores de idade:** a data de nascimento é obrigatória, e o aluno menor de 18 anos só é salvo com um **responsável legal principal**. Irmãos compartilham o mesmo responsável. O principal é o contato de cobrança (o WhatsApp vai para ele) e quem assina a ficha.
-- **Ficha de matrícula:** página para imprimir ou salvar em PDF com os dados da academia, do aluno e do responsável, os termos escritos pela academia e as assinaturas. O perfil mostra "ficha pendente" até ser marcada como assinada.
-- **Saúde (dado sensível):** seção restrita do perfil, com consentimento obrigatório. Fica fora das listas, das buscas, das mensagens e da ficha (a menos que se marque para incluir), e a auditoria registra a alteração sem o conteúdo.
-- **Perfil do aluno:** situação financeira em destaque (em dia, em aberto ou atrasado), último pagamento e abas de informações, mensalidades, pagamentos e histórico.
-- **Mensalidades:** criação individual (com o valor do aluno já preenchido), **geração do mês para todos os alunos ativos** com um clique (sem duplicar), edição e cancelamento enquanto não há pagamento, filtros por situação, período e aluno.
-- **Situações padronizadas:** A vencer, Atrasada, Paga e Cancelada. "Em aberto" é usado só para valores.
-- **Atraso calculado:** uma mensalidade fica "pendente" no banco e aparece como **atrasada** quando o vencimento já passou, pelo horário de Brasília. Não depende de tarefa agendada nem de alteração manual.
-- **Pagamentos:** aluno escolhido por busca (nome, telefone ou e-mail, com modalidade e situação para diferenciar homônimos), vinculados a uma mensalidade ou avulsos, **pagamento parcial** com saldo restante, pagamento "pendente" que só entra no caixa ao ser confirmado, **cancelamento com motivo** (a mensalidade volta a ficar em aberto) e filtros por período, forma e aluno.
-- **Financeiro:** entradas, saídas e saldo do período. **Todo pagamento gera sozinho a entrada correspondente**, e cancelá-lo cancela a entrada. Lançamentos manuais ficam para despesas, matrículas e outros recebimentos; a categoria "Mensalidade" não existe no lançamento manual, então nada é contado duas vezes.
-- **Convite com QR Code:** a academia gera um código e um QR Code (para a recepção, impressão ou WhatsApp). O aluno escaneia, cria a própria conta e o pedido chega para aprovação. O administrador aprova completando modalidade, início e mensalidade, ou **vincula a conta a um aluno já cadastrado** (o sistema sugere pelo e-mail ou telefone). Pedidos recusados ficam no histórico, com aviso ao aluno. Só para maiores de 18 anos; menores continuam cadastrados pelo administrador.
-- **Contas:** só o administrador da plataforma cria academias, informando o e-mail do responsável, que recebe um link para criar a senha. Alunos criam a própria conta em "Criar conta" e ficam sem academia até uma academia adicioná-los pelo e-mail (ou entram direto pelo convite).
-- **Área do aluno:** depois da aprovação, o aluno entra e vê **só os próprios dados**: cadastro, mensalidades com situação e saldo, e pagamentos. Somente leitura.
-- **Cobrança pelo WhatsApp:** no perfil e nas pendências, um link abre o WhatsApp com a mensagem pronta (valor e vencimento). Não há integração: nada é enviado pelo sistema.
-- **Celular primeiro:** barra inferior com Início, Alunos, Registrar pagamento, Mensalidades e Mais; filtros recolhíveis; confirmações em janela própria.
-- **E-mails:** link de acesso de academias novas, recuperação de senha (link válido por 30 minutos e de uso único, sem revelar se o e-mail tem conta) e convite por e-mail. Envio por SMTP (Gmail, Outlook, e-mail do domínio...) ou Resend; sem configurar, os e-mails aparecem no console do servidor. Guia em [docs/email.md](docs/email.md).
-- **Recibo de pagamento:** para imprimir, salvar em PDF ou enviar pelo WhatsApp, com o valor por extenso e o responsável como pagador quando o aluno é menor. O aluno também vê os próprios recibos.
-- **Direitos do titular (LGPD):** exportar todos os dados de um aluno (o próprio aluno também baixa os dele) e eliminar os dados pessoais mantendo o financeiro de forma anônima.
-- **Login real:** senha com hash (bcrypt), sessão no banco com cookie httpOnly e limite de tentativas.
-- **Auditoria:** quem criou, confirmou ou cancelou pagamentos, quem alterou mensalidades, alunos e acessos, quando e em qual academia.
-- **Multi-academia na base:** cada academia só enxerga os próprios dados; trocar um ID na URL não atravessa academias (há testes para isso).
-- **Documentação dentro do sistema**, no menu "Documentação".
+---
 
-Detalhes em [docs/README.md](docs/README.md). Para entender o projeto por inteiro, comece pelo [guia de estudo](docs/guia-de-estudo.md).
+## Visão geral
 
-## Fora do escopo do MVP
+O Fight Manager foi desenvolvido para simplificar as principais tarefas administrativas de uma academia, com uma interface responsiva e foco na rotina de quem administra o negócio.
 
-Contratos, assinatura digital, notificações, WhatsApp, presença e check-in, aplicativo mobile, área do aluno e do professor, recorrência automática, integrações financeiras, relatórios avançados e permissões detalhadas. A área do aluno é só de consulta: não há pagamento pelo aplicativo, edição de dados nem outros recursos para alunos. Ver [docs/roadmap.md](docs/roadmap.md).
+Entre as principais funcionalidades estão:
 
-## Stack
+- Gestão de alunos, responsáveis e matrículas.
+- Controle de mensalidades e pagamentos, incluindo pagamentos parciais.
+- Acompanhamento de receitas, despesas e saldo financeiro.
+- Convites de novos alunos por link e QR Code.
+- Área do aluno para consultar mensalidades, pagamentos e recibos.
+- Controle de acesso e isolamento de dados entre academias.
+- Auditoria das principais operações do sistema.
 
-Next.js 16 (App Router, Server Components e Server Actions), React 19, TypeScript, PostgreSQL 16, Drizzle ORM, Zod (validação), bcryptjs, qrcode, Vitest, Docker e Docker Compose. Fontes Manrope e Barlow Condensed auto-hospedadas (@fontsource), sem depender de serviços externos no build. Nodemailer para e-mail por SMTP.
+## Conheça o sistema
 
-## Como rodar
+O fluxo principal de utilização é simples:
 
-### Com Docker (mais simples)
+**Localizar um aluno → Consultar seu perfil → Verificar as mensalidades → Registrar um pagamento.**
 
-Pré-requisitos: Docker e Docker Compose.
+O painel inicial reúne informações importantes para a rotina administrativa, como mensalidades atrasadas, solicitações de entrada, vencimentos próximos e resumo financeiro do mês.
+
+> **Demonstração visual**
+>
+> Adicione aqui capturas de tela do sistema para que os visitantes possam conhecer a interface sem precisar executá-lo.
+>
+> Sugestões de telas:
+> - Painel inicial
+> - Lista e perfil dos alunos
+> - Controle de mensalidades
+> - Registro de pagamentos
+> - Painel financeiro
+> - Área do aluno
+>
+> Exemplo de organização sugerida: `docs/images/dashboard.png`.
+
+---
+
+## Funcionalidades
+
+### Gestão de alunos
+
+- Cadastro e edição de alunos, com dados pessoais, endereço, contatos e informações de matrícula.
+- Pesquisa por nome, telefone, e-mail, CPF e dados do responsável.
+- Filtros por situação, além de ativação e inativação de cadastros.
+- Definição de valor mensal e dia de vencimento individual para cada aluno.
+- Cadastro de responsáveis legais, com suporte a irmãos vinculados ao mesmo responsável.
+- Ficha de matrícula para impressão ou geração de PDF, com termos e assinaturas.
+- Seção restrita para informações de saúde, com consentimento obrigatório.
+
+### Mensalidades e pagamentos
+
+- Geração individual de mensalidades ou geração em lote para todos os alunos ativos, sem duplicação.
+- Controle de vencimentos e situações: a vencer, atrasada, paga e cancelada.
+- Cálculo automático de atrasos, considerando o horário de Brasília.
+- Registro de pagamentos vinculados a mensalidades ou avulsos.
+- Suporte a pagamentos parciais, com acompanhamento do saldo restante.
+- Confirmação de pagamentos pendentes e cancelamento com justificativa.
+- Recibos para impressão, PDF ou compartilhamento pelo WhatsApp.
+
+### Financeiro
+
+- Acompanhamento de receitas, despesas e saldo por período.
+- Geração automática de entradas financeiras a partir dos pagamentos confirmados.
+- Cancelamento automático da entrada correspondente quando um pagamento é cancelado.
+- Lançamentos manuais para despesas, matrículas e outros recebimentos.
+- Prevenção de duplicidade entre pagamentos de mensalidades e lançamentos financeiros.
+
+### Convites e área do aluno
+
+- Geração de convites por link e QR Code.
+- Cadastro de alunos por meio de convites, com aprovação pelo administrador.
+- Possibilidade de vincular uma conta a um aluno já cadastrado.
+- Histórico de solicitações aprovadas e recusadas.
+- Área do aluno com acesso somente aos próprios dados, mensalidades, pagamentos e recibos.
+
+### Segurança e privacidade
+
+- Autenticação com senhas protegidas por hash bcrypt.
+- Sessões armazenadas no banco e cookies `httpOnly`.
+- Limite de tentativas de login.
+- Isolamento de dados entre academias, com verificações no servidor.
+- Auditoria de operações administrativas e financeiras.
+- Exportação dos dados pessoais de um aluno e anonimização dos dados pessoais, preservando o histórico financeiro.
+
+### Experiência de uso
+
+- Interface responsiva, com navegação adaptada a celulares.
+- Barra de navegação inferior para as principais ações em dispositivos móveis.
+- Filtros recolhíveis e janelas próprias para confirmações.
+- Cobrança pelo WhatsApp com mensagens pré-preenchidas, sem envio automático.
+- Recuperação de senha e envio de convites por e-mail.
+
+---
+
+## Tecnologias utilizadas
+
+| Tecnologia | Utilização |
+|---|---|
+| Next.js 16 | Aplicação web, App Router e Server Actions |
+| React 19 | Interface e componentes |
+| TypeScript | Tipagem estática |
+| PostgreSQL 16 | Banco de dados relacional |
+| Drizzle ORM | Consultas e gerenciamento do schema |
+| Zod | Validação de dados |
+| bcryptjs | Hash de senhas |
+| Nodemailer | Envio de e-mails por SMTP |
+| Resend | Alternativa para envio de e-mails |
+| qrcode | Geração de QR Codes |
+| Vitest | Testes automatizados |
+| Playwright | Testes de ponta a ponta |
+| Docker | Containerização |
+| Docker Compose | Orquestração do ambiente local |
+
+As fontes Manrope e Barlow Condensed são hospedadas localmente, sem dependência de serviços externos durante o build.
+
+---
+
+## Executando o projeto
+
+### Pré-requisitos
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) com suporte ao Docker Compose.
+
+### 1. Clone o repositório
+
+```bash
+git clone https://github.com/VictorHcss/fight-manager.git
+cd fight-manager
+```
+
+### 2. Configure as variáveis de ambiente
+
+Copie o arquivo de exemplo:
 
 ```bash
 cp .env.example .env
-docker compose up -d --build          # sobe o PostgreSQL e a aplicação (as migrations rodam sozinhas)
-docker compose exec app npm run db:seed   # opcional: dados de desenvolvimento
 ```
 
-Acesse **http://localhost:3000**. Com o seed, a tela de login mostra as contas de teste (clique para preencher). Todas usam a senha `fightmanager123`:
+Revise as configurações do `.env` conforme necessário. Para o ambiente local com Docker, os valores de exemplo são suficientes para iniciar o sistema.
 
-| Conta | Tipo | O que dá para testar |
-|---|---|---|
-| `plataforma@fightmanager.dev` | Administrador da plataforma | Criar academias e gerar o link de acesso do responsável |
-| `admin@academia.dev` | Administrador da academia | Painel completo: alunos, mensalidades, pagamentos, financeiro, convites |
-| `aluno@academia.dev` | Aluno aprovado | Área do aluno com mensalidades, pagamentos e recibos |
-| `pendente@academia.dev` | Aluno aguardando aprovação | Pedido pelo convite, em Solicitações |
-| `semacademia@academia.dev` | Aluno sem academia | Conta criada em "Criar conta"; adicione pelo e-mail em Solicitações |
-
-Rodar o seed de novo num banco antigo só acrescenta as contas que faltam. Para esconder as contas de teste do login, use `SHOW_TEST_ACCOUNTS=false`.
-
-Outros comandos:
+### 3. Inicie a aplicação
 
 ```bash
-docker compose logs -f app            # ver os logs
-docker compose down                   # parar
-docker compose down -v                # parar e APAGAR o banco (reset de desenvolvimento)
-docker compose exec app npm run db:migrate   # aplicar migrations manualmente
+docker compose up -d --build
 ```
 
-### Sem Docker
+O Docker Compose inicia o PostgreSQL e a aplicação. As migrations são executadas automaticamente na inicialização.
 
-Pré-requisitos: Node.js 20+ e PostgreSQL 14+.
+### 4. Popule o banco de dados
+
+Para carregar os dados de demonstração:
+
+```bash
+docker compose exec -e NODE_ENV=development app npm run db:seed
+```
+
+### 5. Acesse o sistema
+
+Abra [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Executando sem Docker
+
+Também é possível executar o projeto diretamente no ambiente local.
+
+**Pré-requisitos:**
+- Node.js 20 ou superior.
+- PostgreSQL 14 ou superior.
+
+Instale as dependências:
 
 ```bash
 npm install
-cp .env.example .env                  # ajuste DATABASE_URL e TEST_DATABASE_URL
+```
+
+Configure o ambiente:
+
+```bash
+cp .env.example .env
+```
+
+Ajuste as URLs de conexão com o PostgreSQL no `.env` e execute:
+
+```bash
 npm run db:migrate
-npm run db:seed                       # opcional
-npm run dev                           # http://localhost:3000
+npm run db:seed
+npm run dev
 ```
 
-### Uso real (sem dados de exemplo)
+A aplicação ficará disponível em [http://localhost:3000](http://localhost:3000).
 
-1. Configure o envio de e-mails ([docs/email.md](docs/email.md)) e teste com `npm run email:test -- seu@email.com`.
-2. Crie o administrador da plataforma:
+---
+
+## Testes e qualidade
+
+O projeto utiliza testes automatizados para verificar as regras de negócio e os principais fluxos da aplicação.
+
+| Comando | Finalidade |
+|---|---|
+| `npm test` | Executa os testes automatizados com PostgreSQL |
+| `npm run lint` | Verifica padrões e possíveis problemas no código |
+| `npm run build` | Gera a versão de produção |
+| `npm run test:e2e` | Executa testes de ponta a ponta com Playwright |
+
+Para executar os testes de ponta a ponta pela primeira vez:
 
 ```bash
-ADMIN_PASSWORD="uma-senha-forte-aqui" npm run db:create-platform-admin -- "Seu Nome" voce@email.com
+npx playwright install chromium
 ```
 
-3. Entre com essa conta e crie as academias em **/plataforma**. O responsável de cada uma recebe o link para criar a senha.
+O conjunto documentado de testes contempla **92 testes automatizados e 13 testes de ponta a ponta**, cobrindo regras financeiras, autenticação, isolamento entre academias, auditoria, convites e área do aluno.
 
-Para criar uma academia direto pelo terminal, sem a tela: `ADMIN_PASSWORD="..." npm run db:create-admin -- "Nome da Academia" "Nome do Responsável" responsavel@email.com`.
+O GitHub Actions executa a integração contínua por meio do fluxo definido em `.github/workflows/ci.yml`.
 
-## Testes
+---
 
-Os testes rodam contra um **PostgreSQL de verdade** (o banco de `TEST_DATABASE_URL`, que é apagado e recriado a cada execução):
-
-```bash
-npm test           # regras de negócio, isolamento, concorrência (PostgreSQL real)
-npm run lint       # padrões e erros comuns no código
-npm run build && npm run test:e2e   # ponta a ponta no navegador (Playwright)
-```
-
-Na primeira vez, instale o navegador dos testes de ponta a ponta com `npx playwright install chromium`. O GitHub Actions (`.github/workflows/ci.yml`) roda tudo isso a cada commit.
-
-São 92 testes automatizados e 13 de ponta a ponta. Os automatizados cobrindo dinheiro em centavos, fuso horário, atraso, validações, pesquisa, geração do mês, pagamento parcial, cancelamento, entradas automáticas, totais do financeiro, isolamento entre academias, auditoria e login, além do fluxo de convite (token, revogação, limite de usos, maioridade, isolamento, aprovação, vínculo, recusa e área do aluno) e das contas (aluno sem academia, academia adicionando pelo e-mail, academia criada pela plataforma com link de acesso e convite por e-mail). Detalhes em [docs/development.md](docs/development.md).
-
-## Estrutura
+## Estrutura do projeto
 
 ```text
-app/            páginas e Server Actions (App Router)
-  (app)/        área logada da academia: dashboard, alunos, mensalidades, pagamentos, financeiro...
-  login/        entrar e sair (com as contas de teste em desenvolvimento)
-  criar-conta/  conta de aluno sem convite (fica sem academia até ser adicionado)
-  plataforma/   administrador da plataforma: cria academias e vê números gerais
-  convite/      página pública aberta pelo QR Code (cadastro do aluno)
-  aluno/        área do aluno (somente leitura)
-components/     componentes de interface reutilizáveis
-services/       regras de negócio e acesso a dados (sempre filtrando pela academia)
-lib/            dinheiro, datas, validações, autenticação e utilitários
-db/             schema do Drizzle e conexão
-drizzle/        migrations geradas
-scripts/        migrate, seed e criação do primeiro administrador
-tests/          testes automatizados
-docs/           documentação técnica
+app/             Páginas e Server Actions
+  (app)/         Área administrativa da academia
+  login/         Autenticação
+  criar-conta/   Cadastro de alunos
+  plataforma/    Administração da plataforma
+  convite/       Cadastro por convite
+  aluno/         Área do aluno
+
+components/      Componentes reutilizáveis
+services/        Regras de negócio e acesso a dados
+lib/             Autenticação, dinheiro, datas e validações
+db/              Schema e conexão com o banco
+drizzle/         Migrations
+scripts/         Seed e comandos administrativos
+tests/           Testes automatizados
+docs/            Documentação técnica
 ```
 
-## Limitações conhecidas
+---
 
-- Não há confirmação de e-mail no cadastro do aluno (a aprovação da academia é a barreira).
-- Todos os administradores de uma academia têm o mesmo nível de acesso.
-- O limite de tentativas de login fica em memória: com várias instâncias do servidor, cada uma conta separado.
-- As listas mostram até 100 ou 200 registros; os filtros encontram os demais. Não há paginação.
-- O painel da plataforma cria academias e reenvia o acesso, mas suspender academias ainda é feito no banco.
+## Documentação
 
-Mais em [docs/troubleshooting.md](docs/troubleshooting.md) e [docs/roadmap.md](docs/roadmap.md).
+Para conhecer melhor a arquitetura e as decisões do projeto, consulte:
+
+- [Documentação geral](docs/README.md)
+- [Guia de estudo do projeto](docs/guia-de-estudo.md)
+- [Requisitos](docs/requisitos.md)
+- [Desenvolvimento e testes](docs/development.md)
+- [Configuração de e-mail](docs/email.md)
+- [Solução de problemas](docs/troubleshooting.md)
+- [Roadmap](docs/roadmap.md)
+
+---
+
+## Roadmap
+
+O projeto possui espaço para evoluir com funcionalidades como:
+
+- Controle de presença e check-in.
+- Notificações e lembretes automáticos.
+- Recorrência automática de cobranças.
+- Integrações financeiras.
+- Relatórios avançados.
+- Permissões administrativas mais detalhadas.
+- Recursos adicionais para professores e alunos.
+
+As funcionalidades planejadas e seu estado atual estão descritos no [roadmap](docs/roadmap.md).
+
+---
 
 ## Licença
 
-MIT © Victor H.
+Este projeto está licenciado sob a licença MIT.
+
+**Desenvolvido por Victor H.**
