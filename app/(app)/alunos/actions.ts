@@ -1,18 +1,21 @@
 "use server";
 
+import { grantGuardianAccess, revokeGuardianAccess } from "@/services/guardian-access";
+import { siteUrl } from "@/lib/url";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { handleForm, type ActionState } from "@/lib/action";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
 import { guardianInput, studentInput } from "@/lib/validation";
 import { DomainError } from "@/lib/errors";
-import { isValidDate, today } from "@/lib/dates";
+import { isValidDate, todayIn } from "@/lib/dates";
 import { removeGuardian, saveGuardian, searchGuardians, setPrimaryGuardian } from "@/services/guardians";
 import { anonymizeStudent } from "@/services/privacy";
 import { createStudent, listStudents, setEnrollmentSigned, setStudentStatus, updateHealth, updateStudent } from "@/services/students";
 
 export async function createStudentAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   let id = "";
   const state = await handleForm(form, studentInput, async (data) => { id = (await createStudent(ctx, data)).id; });
   if (!id) return state;
@@ -21,7 +24,7 @@ export async function createStudentAction(_: ActionState, form: FormData): Promi
 }
 
 export async function updateStudentAction(id: string, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   let saved = false;
   const state = await handleForm(form, studentInput, async (data) => { await updateStudent(ctx, id, data); saved = true; });
   if (!saved) return state;
@@ -30,7 +33,7 @@ export async function updateStudentAction(id: string, _: ActionState, form: Form
 }
 
 export async function toggleStudentStatusAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const id = String(form.get("id"));
   const status = form.get("status") === "active" ? "active" : "inactive";
   await setStudentStatus(ctx, id, status);
@@ -48,7 +51,7 @@ export async function searchStudentsAction(q: string) {
 
 /** Busca de responsáveis já cadastrados na academia (para ligar irmãos ao mesmo responsável). */
 export async function searchGuardiansAction(q: string) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   if (typeof q !== "string" || q.trim().length < 2) return [];
   return searchGuardians(ctx, q.slice(0, 80));
 }
@@ -60,7 +63,7 @@ function back(id: string, aba: string, ok: string) {
 }
 
 export async function saveGuardianAction(studentId: string, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   let ok = false;
   const state = await handleForm(form, guardianInput, async (data) => { await saveGuardian(ctx, studentId, data); ok = true; });
   if (!ok) return state;
@@ -79,19 +82,19 @@ async function guarded(studentId: string, run: () => Promise<unknown>, aba: stri
 }
 
 export async function primaryGuardianAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const id = String(form.get("studentId"));
   await guarded(id, () => setPrimaryGuardian(ctx, id, String(form.get("guardianId"))), "info", "responsavel-salvo");
 }
 
 export async function removeGuardianAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const id = String(form.get("studentId"));
   await guarded(id, () => removeGuardian(ctx, id, String(form.get("guardianId"))), "info", "responsavel-removido");
 }
 
 export async function saveHealthAction(studentId: string, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("saude");
   try {
     await updateHealth(ctx, studentId, String(form.get("notes") ?? ""), form.get("consent") === "on");
   } catch (error) {
@@ -103,14 +106,14 @@ export async function saveHealthAction(studentId: string, _: ActionState, form: 
 }
 
 export async function signedAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const id = String(form.get("id"));
   const date = String(form.get("date") ?? "");
-  await guarded(id, () => setEnrollmentSigned(ctx, id, form.get("undo") ? null : isValidDate(date) ? date : today()), "info", "ficha-assinada");
+  await guarded(id, () => setEnrollmentSigned(ctx, id, form.get("undo") ? null : isValidDate(date) ? date : todayIn(ctx.timezone)), "info", "ficha-assinada");
 }
 
 export async function anonymizeAction(studentId: string, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   try {
     await anonymizeStudent(ctx, studentId, String(form.get("confirmation") ?? ""));
   } catch (error) {
@@ -119,4 +122,21 @@ export async function anonymizeAction(studentId: string, _: ActionState, form: F
   }
   revalidatePath("/", "layout");
   redirect(`/alunos/${studentId}?ok=dados-eliminados`);
+}
+
+/** Libera (ou remove) a área do responsável para um responsável deste aluno. */
+export async function guardianAccessAction(form: FormData) {
+  const ctx = await requireAcademyAdmin("alunos");
+  const studentId = String(form.get("studentId"));
+  const guardianId = String(form.get("guardianId"));
+  const back = `/alunos/${studentId}?aba=info`;
+  try {
+    if (form.get("revoke")) await revokeGuardianAccess(ctx, guardianId);
+    else await grantGuardianAccess(ctx, guardianId, await siteUrl());
+  } catch (error) {
+    if (error instanceof DomainError) redirect(`${back}&erro=${encodeURIComponent(error.message)}`);
+    throw error;
+  }
+  revalidatePath(`/alunos/${studentId}`);
+  redirect(`${back}&ok=${form.get("revoke") ? "responsavel-sem-acesso" : "responsavel-com-acesso"}`);
 }

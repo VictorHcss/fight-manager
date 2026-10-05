@@ -14,7 +14,7 @@ import { cancelPaymentAction, confirmPaymentAction } from "./actions";
 export const metadata: Metadata = { title: "Pagamentos" };
 
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   const sp = await searchParams;
   const method = sp.forma && sp.forma in PAYMENT_METHODS ? (sp.forma as keyof typeof PAYMENT_METHODS) : undefined;
   const status = sp.status && sp.status in PAYMENT_STATUS ? (sp.status as keyof typeof PAYMENT_STATUS) : undefined;

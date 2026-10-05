@@ -7,6 +7,9 @@ import { DomainError } from "@/lib/errors";
 import { siteUrl } from "@/lib/url";
 import { platformAcademyInput } from "@/lib/validation";
 import { createAcademyWithAdmin, resendAdminAccess } from "@/services/accounts";
+import { setAcademyActive } from "@/services/users";
+import { redirect } from "next/navigation";
+import { isUuid } from "@/lib/page";
 
 /** Resultado mostrado depois de criar a academia ou gerar um novo link: o link fica visível uma vez, para copiar. */
 export type AccessState = ActionState & { created?: { academy: string; email: string; link: string; sent: boolean } };
@@ -32,4 +35,15 @@ export async function resendAccessAction(_: AccessState, form: FormData): Promis
     if (error instanceof DomainError) return { message: error.message };
     throw error;
   }
+}
+
+/** Suspender ou reativar: confirmado numa janela antes de enviar. */
+export async function toggleAcademyAction(form: FormData) {
+  const ctx = await requirePlatformAdmin();
+  const id = String(form.get("academyId"));
+  const active = form.get("active") === "true";
+  if (!isUuid(id)) redirect("/plataforma");
+  await setAcademyActive(ctx, id, active);
+  revalidatePath("/plataforma");
+  redirect(`/plataforma?ok=${active ? "academia-reativada" : "academia-suspensa"}`);
 }

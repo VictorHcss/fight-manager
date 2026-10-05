@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { handleForm, type ActionState } from "@/lib/action";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
 import { DomainError } from "@/lib/errors";
-import { academyInput, modalityInput, passwordChangeInput, userInput } from "@/lib/validation";
+import { academyInput, formToObject, modalityInput, passwordChangeInput, permissionsFromForm, userInput } from "@/lib/validation";
 import { createModality, setModalityActive, updateAcademy, updateModality, updateTerms } from "@/services/academy";
 import { createSession } from "@/lib/auth/session";
-import { changePassword, createAcademyAdmin, setUserActive } from "@/services/users";
+import { changePassword, createAcademyAdmin, setUserActive, updateUserPermissions } from "@/services/users";
 
 const done = (aba: string, ok: string) => {
   revalidatePath("/", "layout");
@@ -16,16 +16,18 @@ const done = (aba: string, ok: string) => {
 };
 
 export async function createUserAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("full");
+  const access = permissionsFromForm(form);
+  if ("error" in access) return { message: access.error, errors: { access: access.error }, values: { ...formToObject(form), password: "" } };
   let ok = false;
-  const state = await handleForm(form, userInput, async (data) => { await createAcademyAdmin(ctx, data); ok = true; });
+  const state = await handleForm(form, userInput, async (data) => { await createAcademyAdmin(ctx, data, access.permissions); ok = true; });
   if (!ok) return { ...state, values: { ...state.values, password: "" } };
   done("acesso", "usuario-criado");
   return {};
 }
 
 export async function toggleUserAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("full");
   try {
     await setUserActive(ctx, String(form.get("id")), form.get("active") === "true");
   } catch (error) {
@@ -33,6 +35,20 @@ export async function toggleUserAction(form: FormData) {
     throw error;
   }
   done("acesso", "usuario-salvo");
+}
+
+export async function updatePermissionsAction(id: string, _: ActionState, form: FormData): Promise<ActionState> {
+  const ctx = await requireAcademyAdmin("full");
+  const access = permissionsFromForm(form);
+  if ("error" in access) return { message: access.error };
+  try {
+    await updateUserPermissions(ctx, id, access.permissions);
+  } catch (error) {
+    if (error instanceof DomainError) return { message: error.message };
+    throw error;
+  }
+  done("acesso", "acesso-alterado");
+  return {};
 }
 
 export async function changePasswordAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -46,7 +62,7 @@ export async function changePasswordAction(_: ActionState, form: FormData): Prom
 }
 
 export async function updateAcademyAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("configuracoes");
   let ok = false;
   const state = await handleForm(form, academyInput, async (data) => { await updateAcademy(ctx, data); ok = true; });
   if (!ok) return state;
@@ -55,14 +71,14 @@ export async function updateAcademyAction(_: ActionState, form: FormData): Promi
 }
 
 export async function updateTermsAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("configuracoes");
   await updateTerms(ctx, String(form.get("terms") ?? ""));
   done("ficha", "termos-salvos");
   return {};
 }
 
 export async function saveModalityAction(id: string | null, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("configuracoes");
   let ok = false;
   const state = await handleForm(form, modalityInput, async (data) => { if (id) await updateModality(ctx, id, data); else await createModality(ctx, data); ok = true; });
   if (!ok) return state;
@@ -71,7 +87,7 @@ export async function saveModalityAction(id: string | null, _: ActionState, form
 }
 
 export async function toggleModalityAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("configuracoes");
   await setModalityActive(ctx, String(form.get("id")), form.get("active") === "true");
   done("modalidades", "modalidade-salva");
 }

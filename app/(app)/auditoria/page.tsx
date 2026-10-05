@@ -9,7 +9,7 @@ import { countAudit, listAudit } from "@/services/audit";
 export const metadata: Metadata = { title: "Auditoria" };
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("auditoria");
   const sp = await searchParams;
   const page = pageFrom(sp.pagina);
   const [logs, total] = await Promise.all([listAudit(ctx, PAGE_SIZE, offsetOf(page)), countAudit(ctx)]);

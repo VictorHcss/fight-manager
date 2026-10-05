@@ -1,0 +1,15 @@
+/* Identidade visual aplicada por cima das telas: títulos e números condensados e superfícies.
+   Fica depois das telas porque ajusta regras delas. */
+
+/* títulos e números em destaque */
+.page-header h1, .auth-title, .greeting, .attention-card strong, .stat strong, .hero-title, .next-payment strong, .collection-total strong, .receipt-title strong, .auth-side-title { font-family: var(--display); letter-spacing: 0.005em; font-weight: 700; }
+
+.greeting { font-size: 2.2rem; line-height: 1; margin: 0.4rem 0 1.1rem; }
+
+/* superfícies */
+.card, .stat, .attention-card { box-shadow: var(--shadow); }
+
+.card-head h2, .section-title { font-size: 1.02rem; font-weight: 750; letter-spacing: -0.01em; }
+.stat--link, .attention-card { transition: border-color 0.15s ease, transform 0.15s ease; }
+.stat--link:hover, .attention-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.attention-card.is-danger:hover { border-color: color-mix(in srgb, var(--danger) 60%, transparent); }

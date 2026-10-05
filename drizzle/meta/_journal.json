@@ -57,6 +57,27 @@
       "when": 1790700405635,
       "tag": "0007_conta_sem_academia",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790870384310,
+      "tag": "0008_equipe_fuso_pix_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790872112127,
+      "tag": "0009_automacao_lembretes",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790872394013,
+      "tag": "0010_presenca_responsavel",
+      "breakpoints": true
     }
   ]
 }

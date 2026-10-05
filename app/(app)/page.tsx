@@ -1,16 +1,22 @@
 import Link from "next/link";
-import { Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
-import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { currentReference, formatDate, formatReference } from "@/lib/dates";
+import { Alert, Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
+import { can, type Permission } from "@/lib/permissions";
+import { redirect } from "next/navigation";
+import { firstArea, requireAcademyAdmin } from "@/lib/auth/guards";
+import { currentReferenceIn, formatDate, formatReference, shortReference } from "@/lib/dates";
 import { FEE_STATUS_LABEL } from "@/lib/fee-status";
 import { formatMoney } from "@/lib/money";
 import { setupStatus } from "@/services/academy";
 import { dashboard } from "@/services/dashboard";
 import { reminderText, whatsappLink } from "@/lib/whatsapp";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
   const ctx = await requireAcademyAdmin();
-  const reference = currentReference();
+  // quem não cuida de mensalidades começa na primeira área liberada (sem aviso: é o caminho normal depois do login)
+  if (!can(ctx.permissions, "mensalidades")) redirect(firstArea(ctx.permissions));
+  const { erro } = await searchParams;
+  const allow = (p: Permission) => can(ctx.permissions, p);
+  const reference = currentReferenceIn(ctx.timezone);
   const [d, setup] = await Promise.all([dashboard(ctx, reference), setupStatus(ctx)]);
   const pendencias = [...d.overdue, ...d.upcoming].slice(0, 10);
 
@@ -19,29 +25,31 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader title="Início" description={`Resumo de ${formatReference(reference)}.`}
-        actions={<div className="desktop-only page-actions"><Link href="/alunos/novo" className="btn">Novo aluno</Link><Link href="/mensalidades/gerar" className="btn">Gerar mensalidades do mês</Link><Link href="/pagamentos/novo" className="btn btn--primary">Registrar pagamento</Link></div>} />
-      <Link href="/pagamentos/novo" className="btn btn--primary btn--block mobile-only">Registrar pagamento</Link>
+        actions={<>{allow("alunos") && <Link href="/alunos/novo" className="btn">Novo aluno</Link>}<Link href="/mensalidades/gerar" className="btn">Gerar mensalidades do mês</Link></>} />
+      {erro && <Alert tone="danger">{erro}</Alert>}
 
-      {!setup.complete && (
+      {!setup.complete && allow("configuracoes") && (
         <section className="card setup" aria-label="Configure sua academia">
           <h2>Configure sua academia</h2>
           <p className="small muted">Leva poucos minutos e deixa a ficha de matrícula e o cadastro prontos.</p>
           <ol>{setup.steps.map((st) => <li key={st.key} data-done={st.done}>{st.done ? <span>{st.label}</span> : <Link href={st.href}>{st.label}</Link>}</li>)}</ol>
         </section>
       )}
-      {setup.missingBirth > 0 && <div className="alert alert--info">{setup.missingBirth} aluno(s) ativo(s) sem data de nascimento. Ela é necessária para identificar menores e exigir o responsável. <Link href="/alunos">Ver alunos</Link></div>}
+      {setup.missingBirth > 0 && allow("alunos") && <div className="alert alert--info">{setup.missingBirth} aluno(s) ativo(s) sem data de nascimento. Ela é necessária para identificar menores e exigir o responsável. <Link href="/alunos">Ver alunos</Link></div>}
 
-      <section className="attention" aria-label="Precisa de atenção">
+      <section className={`attention${allow("solicitacoes") ? "" : " attention--2"}`} aria-label="Precisa de atenção">
         <Link href="/mensalidades?status=overdue" className={`attention-card${d.fees.overdueCount ? " is-danger" : " is-ok"}`}>
           <span className="attention-label">Mensalidades atrasadas</span>
           <strong>{d.fees.overdueCount}</strong>
           <span>{d.fees.overdueCount ? `${formatMoney(d.fees.overdueCents)} em aberto` : "Nenhum atraso"}</span>
         </Link>
+{allow("solicitacoes") && (
         <Link href="/solicitacoes" className={`attention-card${d.students.requests ? " is-warn" : ""}`}>
           <span className="attention-label">Solicitações de entrada</span>
           <strong>{d.students.requests}</strong>
           <span>{d.students.requests ? "Aguardando sua aprovação" : "Nenhum pedido novo"}</span>
         </Link>
+        )}
         <Link href="/mensalidades?status=pending" className="attention-card">
           <span className="attention-label">Mensalidades a vencer</span>
           <strong>{d.fees.pendingCount}</strong>
@@ -64,13 +72,13 @@ export default async function DashboardPage() {
                   return (
                     <tr key={f.id}>
                       <td className="primary"><Link href={`/alunos/${f.studentId}`}>{f.studentName}</Link></td>
-                      <td data-label="Referência">{f.reference}</td>
+                      <td data-label="Referência">{shortReference(f.reference)}</td>
                       <td data-label="Vencimento">{formatDate(f.dueDate)}</td>
                       <td data-label="Situação"><Badge status={f.displayStatus}>{FEE_STATUS_LABEL[f.displayStatus]}</Badge></td>
                       <td data-label="Em aberto" className="num">{formatMoney(f.balanceCents)}</td>
                       <td><div className="row-actions">
                         {wa && f.displayStatus === "overdue" && <a className="btn btn--small btn--whatsapp" href={wa} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-                        <Link href={`/pagamentos/novo?aluno=${f.studentId}&mensalidade=${f.id}`} className="btn btn--small">Registrar pagamento</Link>
+                        {allow("pagamentos") && <Link href={`/pagamentos/novo?aluno=${f.studentId}&mensalidade=${f.id}`} className="btn btn--small" aria-label={`Registrar pagamento de ${f.studentName}`}>Receber</Link>}
                       </div></td>
                     </tr>
                   );
@@ -81,14 +89,15 @@ export default async function DashboardPage() {
         )}
       </Card>
 
-      <h2 className="section-title">Resumo do mês</h2>
+      {allow("financeiro") && <>
+      <h2 className="section-title">Caixa do mês</h2>
       <div className="stats">
-        <Stat label="Receita" value={formatMoney(d.finance.incomeCents)} tone="ok" href="/financeiro" />
-        <Stat label="Despesas" value={formatMoney(d.finance.expenseCents)} href="/financeiro?tipo=expense" />
+        <Stat label="Entradas" value={formatMoney(d.finance.incomeCents)} tone="ok" href="/financeiro?tipo=income" />
+        <Stat label="Saídas" value={formatMoney(d.finance.expenseCents)} href="/financeiro?tipo=expense" />
         <Stat label="Saldo" value={formatMoney(d.finance.balanceCents)} tone={d.finance.balanceCents < 0 ? "danger" : "ok"} href="/financeiro" />
-        <Stat label="Pagamentos" value={d.payments.count} hint={formatMoney(d.payments.cents)} href="/pagamentos" />
+        <Stat label="Alunos ativos" value={d.students.active} hint={d.students.inactive ? `${d.students.inactive} inativo(s)` : undefined} href="/alunos" />
       </div>
-      <p className="muted small">{d.students.active} alunos ativos e {d.students.inactive} inativos. <Link href="/alunos">Ver alunos</Link></p>
+      </>}
     </>
   );
 }

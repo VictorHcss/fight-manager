@@ -37,12 +37,15 @@ test("aluno cria conta sem academia e a academia adiciona e aprova pelo e-mail",
 test("plataforma cria a academia e o responsável entra pelo link de acesso", async ({ page }) => {
   const email = `dono${Date.now()}@academia.dev`;
   await login(page, "plataforma@fightmanager.dev");
+  // com academias cadastradas, o formulário fica recolhido em "Nova academia"
+  const create = page.locator("details.create-academy");
+  if (!(await create.getAttribute("open") !== null)) await create.locator("summary").click();
   await page.fill("#academyName", "Academia Tigre Branco");
   await page.fill("#adminName", "Carla Dias");
   await page.fill("#adminEmail", email);
   await page.getByRole("button", { name: "Criar academia e enviar acesso" }).click();
   const link = await page.locator(".access-link input").inputValue();
-  await expect(page.locator("tbody")).toContainText(email);
+  await expect(page.locator(".academy-list")).toContainText(email);
 
   await page.context().clearCookies();
   await page.goto(new URL(link).pathname);

@@ -7,9 +7,10 @@ RUN npm ci
 FROM deps AS build
 WORKDIR /app
 COPY . .
+
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG DATABASE_URL=postgres://fight:fight@localhost:5432/fight_manager
-ENV DATABASE_URL=$DATABASE_URL
+ENV DATABASE_URL=postgres://fight:fight@localhost:5432/fight_manager
+
 RUN npm run build
 
 FROM node:22-alpine AS runner

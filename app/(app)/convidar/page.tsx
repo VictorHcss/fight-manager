@@ -15,7 +15,7 @@ import { InviteTools } from "./InviteTools";
 export const metadata: Metadata = { title: "Convidar alunos" };
 
 export default async function InvitePage() {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("solicitacoes");
   const [invite, pending] = await Promise.all([currentInvite(ctx), pendingRequestsCount(ctx)]);
   const link = `${await siteUrl()}/convite/${invite.token}`;
   // o QR contém só o endereço com o código; nenhum dado da academia ou de pessoas

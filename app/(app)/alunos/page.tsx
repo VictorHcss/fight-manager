@@ -12,7 +12,7 @@ import { countStudents, listStudents } from "@/services/students";
 export const metadata: Metadata = { title: "Alunos" };
 
 export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; pagina?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const sp = await searchParams;
   const { q = "", status = "" } = sp;
   const st = status === "active" || status === "inactive" || status === "suspended" ? status : undefined;

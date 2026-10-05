@@ -13,7 +13,7 @@ import { PrintButton } from "../../../alunos/[id]/ficha/PrintButton";
 export const metadata: Metadata = { title: "Recibo" };
 
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const r = await orNotFound(getReceipt(ctx, id));

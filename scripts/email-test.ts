@@ -1,7 +1,7 @@
 /**
  * Testa a configuração de e-mail enviando uma mensagem de verdade.
  * Uso: npm run email:test -- destino@email.com
- * Mostra qual forma de envio está ativa e o erro completo, se houver (ver docs/email.md).
+ * Mostra qual forma de envio está ativa e o erro completo, se houver (ver docs/instalacao.md).
  */
 import "./load-env";
 import { emailProvider, mailer, smtpConfigFromEnv } from "../lib/email";

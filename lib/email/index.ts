@@ -1,6 +1,6 @@
 /**
  * Envio de e-mails. O sistema só conhece a interface Mailer; qual implementação é usada
- * depende do ambiente (guia completo em docs/email.md):
+ * depende do ambiente (guia completo em docs/instalacao.md):
  *
  *   EMAIL_PROVIDER=resend  (ou só RESEND_API_KEY)  → Resend, por HTTP (exige domínio verificado)
  *   EMAIL_PROVIDER=smtp    (ou só SMTP_HOST)       → qualquer servidor SMTP: Gmail, Outlook,
@@ -138,7 +138,7 @@ export function mailer(): Mailer {
     if (!config) throw new Error("EMAIL_PROVIDER=smtp, mas SMTP_HOST não está definido.");
     chosen = smtpMailer(config, from());
   } else {
-    if (process.env.NODE_ENV === "production") console.warn("E-mail não configurado: as mensagens só aparecem no log do servidor. Veja docs/email.md.");
+    if (process.env.NODE_ENV === "production") console.warn("E-mail não configurado: as mensagens só aparecem no log do servidor. Veja docs/instalacao.md.");
     chosen = devMailer();
   }
   cached = { key, mailer: chosen };

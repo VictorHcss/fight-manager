@@ -5,7 +5,7 @@ import { exportStudentData } from "@/services/privacy";
 
 /** Download dos dados do aluno em JSON (portabilidade, LGPD). */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const { id } = await params;
   if (!isUuid(id)) return new Response("Não encontrado", { status: 404 });
   try {

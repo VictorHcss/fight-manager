@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Ficha de matrícula" };
 
 /** Ficha para impressão: dados do cadastro + termos escritos pela academia + assinaturas. */
 export default async function EnrollmentSheet({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saude?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const withHealth = (await searchParams).saude === "1";

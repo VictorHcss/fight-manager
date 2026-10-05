@@ -5,8 +5,10 @@ import { formatAddress } from "@/components/AddressFields";
 import { CancelPaymentButton, ConfirmSubmit } from "@/components/client";
 import { Alert, Badge, Card, Dl, Empty } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
+import { can } from "@/lib/permissions";
+import { frequencyOf } from "@/services/attendance";
 import { maskCpf } from "@/lib/cpf";
-import { formatDate, formatDateTime, today } from "@/lib/dates";
+import { formatDate, formatDateTime, formatReference, todayIn } from "@/lib/dates";
 import { FEE_STATUS_LABEL } from "@/lib/fee-status";
 import { PAYMENT_METHODS, PAYMENT_STATUS, STUDENT_STATUS } from "@/lib/labels";
 import { formatMoney } from "@/lib/money";
@@ -18,7 +20,7 @@ import { guardiansOf, isMinor } from "@/services/guardians";
 import { listPayments } from "@/services/payments";
 import { getHealth, getStudent, studentFinancialSummary } from "@/services/students";
 import { cancelPaymentAction } from "../../pagamentos/actions";
-import { anonymizeAction, primaryGuardianAction, removeGuardianAction, saveGuardianAction, saveHealthAction, signedAction, toggleStudentStatusAction } from "../actions";
+import { anonymizeAction, guardianAccessAction, primaryGuardianAction, removeGuardianAction, saveGuardianAction, saveHealthAction, signedAction, toggleStudentStatusAction } from "../actions";
 import { EraseForm, GuardianForm, HealthForm } from "../ProfileForms";
 
 export const metadata: Metadata = { title: "Aluno" };
@@ -27,12 +29,14 @@ const SITUATION = { ok: "Em dia", pending: "A vencer", overdue: "Atrasado" } as 
 const TABS = [["info", "Cadastro"], ["mensalidades", "Mensalidades"], ["pagamentos", "Pagamentos"], ["saude", "Saúde"], ["historico", "Histórico"]] as const;
 
 export default async function StudentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aba?: string; erro?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
+  const canPay = can(ctx.permissions, "pagamentos");
+  const tabs = TABS.filter(([key]) => key !== "saude" || can(ctx.permissions, "saude"));
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const { aba = "info", erro } = await searchParams;
   const s = await orNotFound(getStudent(ctx, id));
-  const [summary, fees, payments, guardians] = await Promise.all([studentFinancialSummary(ctx, id), listFees(ctx, { studentId: id }), listPayments(ctx, { studentId: id }), guardiansOf(ctx, id)]);
+  const [summary, fees, payments, guardians, freq] = await Promise.all([studentFinancialSummary(ctx, id), listFees(ctx, { studentId: id }), listPayments(ctx, { studentId: id }), guardiansOf(ctx, id), frequencyOf(ctx.academyId, id, todayIn(ctx.timezone))]);
   const minor = isMinor(s.birthDate);
   const primary = guardians.find((g) => g.isPrimary);
   const openFees = fees.filter((f) => f.displayStatus === "pending" || f.displayStatus === "overdue");
@@ -47,9 +51,9 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
     <>
       <div className="profile-head">
         <div>
-          <Link href="/alunos" className="small muted">← Alunos</Link>
-          <h1 style={{ fontSize: "1.7rem", marginTop: "0.3rem" }}>{s.name}</h1>
-          <p className="muted" style={{ margin: "0.2rem 0 0", display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <Link href="/alunos" className="back-link">← Alunos</Link>
+          <h1 className="profile-title">{s.name}</h1>
+          <p className="muted profile-meta">
             {s.modality} <Badge status={s.status}>{STUDENT_STATUS[s.status]}</Badge>
             {minor && <Badge status="pending">Menor de idade</Badge>}
             {!s.enrollmentSignedAt && <Badge status="pending">Ficha pendente</Badge>}
@@ -64,16 +68,16 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
       {minor && !primary && <Alert tone="danger">Aluno menor de idade sem responsável principal. <Link href={`/alunos/${id}/editar`}>Informe o responsável</Link>.</Alert>}
       {!s.birthDate && <Alert tone="info">Data de nascimento não informada. Ela é obrigatória para saber se o aluno precisa de responsável. <Link href={`/alunos/${id}/editar`}>Completar cadastro</Link></Alert>}
 
-      <div className="stats" style={{ marginTop: "1rem" }}>
-        <div className="stat"><span className="stat-label">Último pagamento</span><strong style={{ fontSize: "1.1rem" }}>{summary.lastPayment ? formatDate(summary.lastPayment.paidAt) : "Nenhum"}</strong>{summary.lastPayment && <span className="stat-hint">{formatMoney(summary.lastPayment.amountCents)}</span>}</div>
-        <div className="stat"><span className="stat-label">Em aberto</span><strong style={{ fontSize: "1.1rem" }}>{summary.pendingCount}</strong><span className="stat-hint">{summary.overdueCount} atrasada(s)</span></div>
-        <div className="stat"><span className="stat-label">Mensalidade</span><strong style={{ fontSize: "1.1rem" }}>{s.monthlyFeeCents === null ? "–" : formatMoney(s.monthlyFeeCents)}</strong><span className="stat-hint">vence todo dia {s.dueDay}</span></div>
-        <div className="stat"><span className="stat-label">Aluno desde</span><strong style={{ fontSize: "1.1rem" }}>{formatDate(s.joinedAt)}</strong></div>
+      <div className="stats stats--compact">
+        <div className="stat"><span className="stat-label">Último pagamento</span><strong>{summary.lastPayment ? formatDate(summary.lastPayment.paidAt) : "Nenhum"}</strong>{summary.lastPayment && <span className="stat-hint">{formatMoney(summary.lastPayment.amountCents)}</span>}</div>
+        <div className="stat"><span className="stat-label">Em aberto</span><strong>{summary.pendingCount}</strong><span className="stat-hint">{summary.overdueCount} atrasada(s)</span></div>
+        <div className="stat"><span className="stat-label">Mensalidade</span><strong>{s.monthlyFeeCents === null ? "–" : formatMoney(s.monthlyFeeCents)}</strong><span className="stat-hint">vence todo dia {s.dueDay}</span></div>
+        <div className="stat"><span className="stat-label">Treinos em 30 dias</span><strong>{freq.last30}</strong><span className="stat-hint">{freq.last ? `último em ${formatDate(freq.last)}` : `aluno desde ${formatDate(s.joinedAt)}`}</span></div>
       </div>
 
       <div className="quick profile-actions">
-        <Link href={`/pagamentos/novo?aluno=${s.id}${openFees[0] ? `&mensalidade=${openFees[0].id}` : ""}`} className="btn btn--primary">Registrar pagamento</Link>
-        {wa && <a href={wa} className="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">{nextOpen ? "Cobrar pelo WhatsApp" : "Chamar no WhatsApp"}{primary ? ` (${primary.name.split(" ")[0]})` : ""}</a>}
+        {canPay && <Link href={`/pagamentos/novo?aluno=${s.id}${openFees[0] ? `&mensalidade=${openFees[0].id}` : ""}`} className="btn btn--primary">Registrar pagamento</Link>}
+        {wa && <a href={wa} className="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">{nextOpen ? "Cobrar" : "WhatsApp"}{primary ? ` ${primary.name.split(" ")[0]}` : ""}</a>}
         {!s.anonymizedAt && <Link href={`/alunos/${s.id}/editar`} className="btn">Editar</Link>}
         <details className="menu">
           <summary className="btn">Mais ações</summary>
@@ -94,7 +98,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
       </div>
 
       <nav className="tabs" aria-label="Seções do perfil">
-        {TABS.map(([key, label]) => <Link key={key} href={`/alunos/${id}?aba=${key}`} aria-current={aba === key ? "page" : undefined} scroll={false}>{label}</Link>)}
+        {tabs.map(([key, label]) => <Link key={key} href={`/alunos/${id}?aba=${key}`} aria-current={aba === key ? "page" : undefined} scroll={false}>{label}</Link>)}
       </nav>
 
       {aba === "info" && (
@@ -116,6 +120,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                       <div>
                         <strong>{g.name}</strong> <span className="muted">({g.relationship})</span> {g.isPrimary && <Badge status="active">Principal</Badge>}
                         <div className="small muted">{[g.phone, g.email, maskCpf(g.cpf)].filter(Boolean).join(", ")}</div>
+                        {g.userId && <div className="small tone-ok">Acessa a área do responsável</div>}
                       </div>
                       <div className="row-actions">
                         {!g.isPrimary && (
@@ -123,6 +128,14 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                             <ConfirmSubmit className="btn btn--small btn--ghost" tone="primary" title="Tornar principal" confirmLabel="Tornar principal" message={`${g.name} passa a ser o contato de cobrança e quem assina a ficha de ${s.name}.`}>Tornar principal</ConfirmSubmit></form>
                         )}
                         <GuardianForm action={saveGuardianAction.bind(null, s.id)} guardian={g as never} onlyOne={guardians.length === 1} />
+                        {g.email && (
+                          <form action={guardianAccessAction}><input type="hidden" name="studentId" value={s.id} /><input type="hidden" name="guardianId" value={g.id} />
+                            {g.userId && <input type="hidden" name="revoke" value="1" />}
+                            <ConfirmSubmit className={`btn btn--small ${g.userId ? "btn--ghost-danger" : ""}`} tone={g.userId ? "danger" : "primary"} title={g.userId ? "Remover acesso" : "Dar acesso ao responsável"} confirmLabel={g.userId ? "Remover acesso" : "Enviar acesso"}
+                              message={g.userId ? `${g.name} deixa de ver os dependentes na área do responsável.` : `${g.name} recebe em ${g.email} um link para criar a senha e acompanhar situação, mensalidades, Pix e recibos dos dependentes nesta academia.`}>
+                              {g.userId ? "Remover acesso" : "Dar acesso"}
+                            </ConfirmSubmit></form>
+                        )}
                         {(!g.isPrimary || !minor) && (
                           <form action={removeGuardianAction}><input type="hidden" name="studentId" value={s.id} /><input type="hidden" name="guardianId" value={g.id} />
                             <ConfirmSubmit className="btn btn--small btn--ghost-danger" title="Remover responsável" confirmLabel="Remover" message={`Remover ${g.name} dos responsáveis de ${s.name}? O cadastro de ${g.name} continua existindo se for responsável por outro aluno.`}>Remover</ConfirmSubmit></form>
@@ -162,7 +175,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
               <form action={signedAction} className="inline-form">
                 <span className="muted">Ainda não assinada.</span>
                 <input type="hidden" name="id" value={s.id} />
-                <label className="small">Assinada em <input type="date" name="date" defaultValue={today()} aria-label="Data da assinatura" /></label>
+                <label className="small">Assinada em <input type="date" name="date" defaultValue={todayIn(ctx.timezone)} aria-label="Data da assinatura" /></label>
                 <ConfirmSubmit className="btn btn--small" tone="primary" title="Ficha assinada" confirmLabel="Confirmar" message={`Confirmar que a ficha de ${s.name} foi assinada${minor && primary ? ` por ${primary.name}` : ""}?`}>Marcar como assinada</ConfirmSubmit>
               </form>
             )}
@@ -177,12 +190,12 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
               <thead><tr><th>Referência</th><th>Vencimento</th><th>Situação</th><th className="num">Valor</th><th className="num">Em aberto</th><th /></tr></thead>
               <tbody>{fees.map((f) => (
                 <tr key={f.id}>
-                  <td className="primary">{f.reference}</td>
+                  <td className="primary">{formatReference(f.reference)}</td>
                   <td data-label="Vencimento">{formatDate(f.dueDate)}</td>
                   <td data-label="Situação"><Badge status={f.displayStatus}>{FEE_STATUS_LABEL[f.displayStatus]}</Badge></td>
                   <td data-label="Valor" className="num">{formatMoney(f.amountCents)}</td>
-                  <td data-label="Em aberto" className="num">{f.status === "canceled" ? "–" : formatMoney(f.balanceCents)}</td>
-                  <td>{f.status === "pending" && <div className="row-actions"><Link className="btn btn--small" href={`/pagamentos/novo?aluno=${s.id}&mensalidade=${f.id}`}>Registrar pagamento</Link></div>}</td>
+                  <td data-label="Em aberto" className="num">{f.status === "canceled" || f.status === "paid" ? "–" : formatMoney(f.balanceCents)}</td>
+                  <td>{f.status === "pending" && canPay && <div className="row-actions"><Link className="btn btn--small" href={`/pagamentos/novo?aluno=${s.id}&mensalidade=${f.id}`} aria-label={`Registrar pagamento de ${f.reference}`}>Receber</Link></div>}</td>
                 </tr>
               ))}</tbody>
             </table></div>
@@ -210,7 +223,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         </Card>
       )}
 
-      {aba === "saude" && <Health studentId={s.id} ctx={ctx} />}
+      {aba === "saude" && can(ctx.permissions, "saude") && <Health studentId={s.id} ctx={ctx} />}
       {aba === "historico" && <History ctx={ctx} studentId={s.id} />}
     </>
   );

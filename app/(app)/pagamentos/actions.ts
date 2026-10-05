@@ -9,7 +9,7 @@ import { paymentInput } from "@/lib/validation";
 import { cancelPayment, confirmPayment, createPayment } from "@/services/payments";
 
 export async function createPaymentAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   let studentId = "";
   const state = await handleForm(form, paymentInput, async (data) => { studentId = (await createPayment(ctx, data)).studentId; });
   if (!studentId) return state;
@@ -30,11 +30,11 @@ async function simple(form: FormData, run: (id: string) => Promise<unknown>, ok:
 }
 
 export async function cancelPaymentAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   await simple(form, (id) => cancelPayment(ctx, id, String(form.get("reason") ?? "")), "pagamento-cancelado");
 }
 
 export async function confirmPaymentAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   await simple(form, (id) => confirmPayment(ctx, id), "pagamento-confirmado");
 }

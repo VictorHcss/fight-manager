@@ -5,7 +5,7 @@ import { formatDateTime } from "@/lib/dates";
 import type { AcademyContext } from "./context";
 
 /** Registra uma ação importante. Roda dentro da mesma transação da ação: ou grava os dois, ou nenhum. */
-export async function audit(tx: Tx, ctx: { userId: string; academyId: string | null }, action: string, entity: string, entityId: string | null, summary: string, data?: Record<string, unknown>) {
+export async function audit(tx: Tx, ctx: { userId: string | null; academyId: string | null }, action: string, entity: string, entityId: string | null, summary: string, data?: Record<string, unknown>) {
   await tx.insert(auditLogs).values({ academyId: ctx.academyId, userId: ctx.userId, action, entity, entityId, summary, data: data ?? null });
 }
 

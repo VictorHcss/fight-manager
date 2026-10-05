@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ConfirmSubmit, FilterToggle } from "@/components/client";
 import { Alert, Badge, Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { currentReference, formatDate, isValidDate, monthRange } from "@/lib/dates";
+import { currentReferenceIn, formatDate, isValidDate, monthRange } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { Pagination } from "@/components/Pagination";
 import { offsetOf, PAGE_SIZE, pageFrom, pagesOf } from "@/lib/pagination";
@@ -13,9 +13,9 @@ import { cancelEntryAction } from "./actions";
 export const metadata: Metadata = { title: "Financeiro" };
 
 export default async function FinancePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("financeiro");
   const sp = await searchParams;
-  const month = monthRange(currentReference());
+  const month = monthRange(currentReferenceIn(ctx.timezone));
   const from = sp.de && isValidDate(sp.de) ? sp.de : month.from;
   const to = sp.ate && isValidDate(sp.ate) ? sp.ate : month.to;
   const type = sp.tipo === "income" || sp.tipo === "expense" ? sp.tipo : undefined;
@@ -26,7 +26,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Financeiro" description={`De ${formatDate(from)} a ${formatDate(to)}. Lançamentos cancelados não entram nos totais.`}
-        actions={<><Link href="/financeiro/novo?tipo=income" className="btn">Nova entrada</Link><Link href="/financeiro/novo" className="btn btn--primary">Nova despesa</Link></>} />
+        actions={<><a href={`/financeiro/exportar?${new URLSearchParams({ de: from, ate: to, ...(type ? { tipo: type } : {}) })}`} className="btn btn--ghost" download>Exportar CSV</a><Link href="/financeiro/novo?tipo=income" className="btn">Nova entrada</Link><Link href="/financeiro/novo" className="btn btn--primary">Nova despesa</Link></>} />
       {sp.erro && <Alert tone="danger">{sp.erro}</Alert>}
       <form className="filters">
         <label>De<input name="de" type="date" defaultValue={from} /></label>
@@ -37,7 +37,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           <button type="submit" className="btn">Filtrar</button>
         </div>
       </form>
-      <div className="stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+      <div className="stats stats--3">
         <Stat label="Entradas" value={formatMoney(summary.incomeCents)} tone="ok" />
         <Stat label="Saídas" value={formatMoney(summary.expenseCents)} tone="danger" />
         <Stat label="Saldo" value={formatMoney(summary.balanceCents)} tone={summary.balanceCents < 0 ? "danger" : "ok"} />

@@ -50,7 +50,10 @@ test("pagamento parcial pela busca, erro que não perde as escolhas, e cancelame
   await expect(toast(page)).toContainText("Pagamento registrado");
   const profile = page.url().split("?")[0];
   await page.goto(`${profile}?aba=mensalidades`);
-  await expect(page.locator(".situation")).toContainText(`${brl(balance - 1000)} em aberto`);
+  // a mensalidade escolhida ficou com o saldo menos R$ 10 (o total do aluno depende do dia do mês:
+  // no começo do mês o exemplo tem duas em aberto, por isso a conferência é na linha da mensalidade)
+  await expect(page.locator("tbody")).toContainText(brl(balance - 1000));
+  await expect(page.locator(".situation")).toContainText("em aberto");
 
   await page.goto(`${profile}?aba=pagamentos`);
   const row = page.locator("tbody tr").first();
@@ -92,7 +95,7 @@ test("convite: menor barrado, adulto aguarda aprovação e depois vê a própria
   await fill("2014-01-01", "menor@aluno.dev");
   await expect(visitor.locator(".field-error")).toContainText("maiores de 18 anos");
   await fill("1995-02-11", "fernanda@aluno.dev");
-  await expect(visitor.locator(".alert")).toContainText("está em análise");
+  await expect(visitor.locator(".alert", { hasText: "está em análise" })).toBeVisible();
 
   await page.goto("/solicitacoes");
   const card = page.locator(".card", { hasText: "Fernanda Alves" });

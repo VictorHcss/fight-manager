@@ -10,7 +10,7 @@ import { feeInput, feeUpdateInput } from "@/lib/validation";
 import { cancelFee, createFee, generateMonthlyFees, updateFee } from "@/services/fees";
 
 export async function createFeeAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   let studentId = "";
   const state = await handleForm(form, feeInput, async (data) => { studentId = (await createFee(ctx, data)).studentId; });
   if (!studentId) return state;
@@ -19,7 +19,7 @@ export async function createFeeAction(_: ActionState, form: FormData): Promise<A
 }
 
 export async function updateFeeAction(id: string, _: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   let saved = false;
   const state = await handleForm(form, feeUpdateInput, async (data) => { await updateFee(ctx, id, data); saved = true; });
   if (!saved) return state;
@@ -28,7 +28,7 @@ export async function updateFeeAction(id: string, _: ActionState, form: FormData
 }
 
 export async function cancelFeeAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   const back = safeBack(form.get("back"), "/mensalidades");
   try {
     await cancelFee(ctx, String(form.get("id")));
@@ -41,7 +41,7 @@ export async function cancelFeeAction(form: FormData) {
 }
 
 export async function generateFeesAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   const reference = String(form.get("reference") ?? "");
   if (!isValidReference(reference)) return { message: "Escolha um mês válido.", errors: { reference: "Mês inválido." }, values: { reference } };
   const result = await generateMonthlyFees(ctx, reference);

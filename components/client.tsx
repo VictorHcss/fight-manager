@@ -74,7 +74,11 @@ const FLASH: Record<string, string> = {
   "pagamento-cancelado": "Pagamento cancelado. A mensalidade voltou a ficar em aberto.",
   "lancamento-criado": "Lançamento registrado.",
   "lancamento-cancelado": "Lançamento cancelado.",
-  "usuario-criado": "Administrador criado.",
+  "usuario-criado": "Pessoa adicionada à equipe.",
+  "acesso-alterado": "Acesso atualizado. Vale a partir da próxima página que a pessoa abrir.",
+  "responsavel-com-acesso": "Acesso liberado. O responsável recebeu o link por e-mail.",
+  "responsavel-sem-acesso": "Acesso do responsável removido.",
+  "email-reenviado": "Enviamos um novo link de confirmação para o seu e-mail.",
   "usuario-salvo": "Acesso atualizado.",
   "senha-alterada": "Senha alterada. Outros aparelhos conectados foram desconectados.",
   "academia-salva": "Dados da academia salvos.",
@@ -94,6 +98,9 @@ const FLASH: Record<string, string> = {
   "aluno-adicionado": "Conta adicionada. Complete os dados para aprovar a entrada.",
   "academia-criada": "Academia criada.",
   "acesso-enviado": "Novo link de acesso gerado.",
+  "academia-suspensa": "Academia suspensa. Os acessos dela foram encerrados.",
+  "academia-reativada": "Academia reativada.",
+  "contato-salvo": "Telefone atualizado nas suas academias.",
 };
 
 /** Mensagem de sucesso após uma ação (vem no parâmetro ?ok= da URL e some sozinha). */

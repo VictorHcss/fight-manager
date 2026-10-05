@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { handleForm, type ActionState } from "@/lib/action";
 import { requireStudent } from "@/lib/auth/guards";
 import { createSession } from "@/lib/auth/session";
+import { siteUrl } from "@/lib/url";
+import { sendEmailVerification } from "@/services/email-verification";
 import { DomainError } from "@/lib/errors";
 import { allow } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/url";
@@ -17,6 +19,7 @@ export async function signupAction(token: string, _: ActionState, form: FormData
   const state = await handleForm(form, signupInput, async (data) => { userId = (await signUpWithInvite(token, data)).userId; });
   if (!userId) return { ...state, values: { ...state.values, password: "", confirm: "" } }; // nunca devolve a senha
   await createSession(userId);
+  await sendEmailVerification(userId, await siteUrl()); // o envio nunca derruba o cadastro (sendSafely)
   redirect("/aluno?ok=pedido-enviado");
 }
 

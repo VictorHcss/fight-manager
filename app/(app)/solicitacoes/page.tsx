@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfirmSubmit } from "@/components/client";
-import { Alert, Card, Dl, Empty, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, Dl, Empty, PageHeader } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { formatDate, formatDateTime, today } from "@/lib/dates";
+import { formatDate, formatDateTime, todayIn } from "@/lib/dates";
 import { listModalities } from "@/services/academy";
 import { listRequests } from "@/services/enrollment";
 import { approveAction, linkAction, rejectAction } from "./actions";
@@ -13,7 +13,7 @@ import { ApproveForm } from "./ApproveForm";
 export const metadata: Metadata = { title: "Solicitações de entrada" };
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("solicitacoes");
   const { erro } = await searchParams;
   const [requests, modalities] = await Promise.all([listRequests(ctx), listModalities(ctx, { activeOnly: true })]);
 
@@ -25,7 +25,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       {requests.length === 0 && <Card><Empty title="Nenhuma solicitação pendente" text="Quando alguém pedir para entrar pelo QR Code, ou quando você adicionar uma conta, o pedido aparece aqui." action={<Link href="/convidar" className="btn btn--primary">Convidar alunos</Link>} /></Card>}
       {requests.map((r) => (
         <Card key={r.id} id={`pedido-${r.id}`} className="request" title={r.name} actions={<span className="small muted">{r.inviteId ? "pedido pelo convite" : "adicionado pela academia"} em {formatDateTime(r.createdAt)}</span>}>
-          <Dl items={[["Telefone", r.phone], ["E-mail", r.email], ["Nascimento", formatDate(r.birthDate)]]} />
+          <Dl items={[["Telefone", r.phone], ["E-mail", <span key="e" className="email-status">{r.email}{r.userId && (r.emailVerified ? <Badge status="active">confirmado</Badge> : <Badge status="pending">não confirmado</Badge>)}</span>], ["Nascimento", formatDate(r.birthDate)]]} />
+          {r.userId && !r.emailVerified && <p className="small muted card-lead">A pessoa ainda não abriu o link de confirmação enviado para esse e-mail. Confira a identidade antes de aprovar.</p>}
 
           {r.matches.length > 0 && (
             <div className="match">
@@ -43,7 +44,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
           <details className="approve" open={r.matches.length === 0}>
             <summary>{r.matches.length ? "Não é a mesma pessoa: aprovar como novo aluno" : "Aprovar e completar os dados da academia"}</summary>
-            <ApproveForm action={approveAction.bind(null, r.id)} today={today()} id={r.id} modalities={modalities} />
+            <ApproveForm action={approveAction.bind(null, r.id)} today={todayIn(ctx.timezone)} id={r.id} modalities={modalities} />
           </details>
 
           <form action={rejectAction} className="inline-form" style={{ marginTop: "0.9rem" }}>

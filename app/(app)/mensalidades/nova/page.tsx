@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { nextDueDate } from "@/lib/dates";
+import { nextDueDate, todayIn } from "@/lib/dates";
 import { centsToInput } from "@/lib/money";
 import { isUuid } from "@/lib/page";
 import { getStudent } from "@/services/students";
@@ -11,10 +11,10 @@ import { FeeForm } from "../FeeForm";
 export const metadata: Metadata = { title: "Nova mensalidade" };
 
 export default async function NewFeePage({ searchParams }: { searchParams: Promise<{ aluno?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   const { aluno = "" } = await searchParams;
   const chosen = aluno && isUuid(aluno) ? await getStudent(ctx, aluno).catch(() => null) : null;
-  const suggestion = nextDueDate(chosen?.dueDay ?? 10);
+  const suggestion = nextDueDate(chosen?.dueDay ?? 10, todayIn(ctx.timezone));
   return (
     <>
       <PageHeader title="Nova mensalidade" description="O valor vem do cadastro do aluno e pode ser ajustado." />

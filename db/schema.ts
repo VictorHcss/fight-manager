@@ -46,6 +46,14 @@ export const academies = pgTable("academies", {
   email: varchar("email", { length: 160 }),
   ...address,
   enrollmentTerms: text("enrollment_terms"), // termos escritos pela academia, impressos na ficha
+  // fuso da academia: decide quando uma mensalidade passa a contar como atrasada
+  timezone: varchar("timezone", { length: 40 }).notNull().default("America/Sao_Paulo"),
+  // chave Pix: gera o "Pix copia e cola" com o valor da mensalidade na área do aluno (sem integração)
+  pixKey: varchar("pix_key", { length: 77 }),
+  // automação (tarefa diária): gerar as mensalidades do mês sozinho e lembrar o aluno por e-mail
+  autoGenerateFees: boolean("auto_generate_fees").notNull().default(true),
+  reminderDaysBefore: integer("reminder_days_before").default(3), // null = sem lembrete antes do vencimento
+  overdueReminder: boolean("overdue_reminder").notNull().default(true), // um aviso no dia seguinte ao vencimento
   ...timestamps,
 });
 
@@ -65,8 +73,22 @@ export const users = pgTable("users", {
   birthDate: date("birth_date"),
   dataConsentAt: timestamp("data_consent_at", { withTimezone: true }),
   dataConsentText: text("data_consent_text"),
+  // administrador da academia: null = acesso total (gerencia a equipe); lista = só o que foi liberado
+  permissions: text("permissions").array(),
+  // e-mail confirmado pelo link enviado no cadastro (contas antigas foram marcadas como confirmadas)
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   ...timestamps,
 }, (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)]);
+
+/** Confirmação de e-mail: como na redefinição de senha, só o hash do token fica no banco. */
+export const emailVerifications = pgTable("email_verifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Pedidos de redefinição de senha: só o hash do token fica no banco; cada link vale uma vez e por pouco tempo. */
 export const passwordResets = pgTable("password_resets", {
@@ -176,6 +198,8 @@ export const guardians = pgTable("guardians", {
   cpf: varchar("cpf", { length: 14 }),
   phone: varchar("phone", { length: 20 }).notNull(),
   email: varchar("email", { length: 160 }),
+  // conta de acesso do responsável (perfil STUDENT): na área dele aparecem os dependentes
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   ...address,
   ...timestamps,
 }, (t) => [index("guardians_academy_name_idx").on(t.academyId, sql`lower(${t.name})`)]);
@@ -244,6 +268,25 @@ export const financialEntries = pgTable("financial_entries", {
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
 }, (t) => [index("entries_academy_date_idx").on(t.academyId, t.date)]);
+
+/** Presença: no máximo uma por aluno por dia (marcada pela equipe). */
+export const attendances = pgTable("attendances", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  academyId: uuid("academy_id").notNull().references(() => academies.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("attendances_student_date").on(t.studentId, t.date), index("attendances_academy_date_idx").on(t.academyId, t.date)]);
+
+/** Lembretes de mensalidade já enviados: no máximo um de cada tipo por mensalidade (a tarefa diária pode rodar várias vezes). */
+export const feeReminders = pgTable("fee_reminders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  feeId: uuid("fee_id").notNull().references(() => fees.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 20 }).notNull(), // "before" | "overdue"
+  sentTo: varchar("sent_to", { length: 160 }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("fee_reminders_fee_kind").on(t.feeId, t.kind)]);
 
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),

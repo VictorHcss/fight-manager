@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { handleForm, type ActionState } from "@/lib/action";
 import { createSession } from "@/lib/auth/session";
+import { siteUrl } from "@/lib/url";
+import { sendEmailVerification } from "@/services/email-verification";
 import { allow } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/url";
 import { inviteTokenFrom, studentAccountInput } from "@/lib/validation";
@@ -16,6 +18,7 @@ export async function studentSignupAction(_: ActionState, form: FormData): Promi
   const state = await handleForm(form, studentAccountInput, async (data) => { userId = (await signUpStudent(data)).userId; });
   if (!userId) return { ...state, values: { ...state.values, password: "", confirm: "" } }; // nunca devolve a senha
   await createSession(userId);
+  await sendEmailVerification(userId, await siteUrl()); // o envio nunca derruba o cadastro (sendSafely)
   redirect("/aluno?ok=conta-criada");
 }
 
