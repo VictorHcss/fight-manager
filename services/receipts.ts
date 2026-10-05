@@ -1,3 +1,4 @@
+import { ownsOrGuards } from "./guardian-access";
 /** Recibo de um pagamento: dados do pagamento, de quem pagou e da academia. */
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -28,6 +29,6 @@ export const getReceipt = (ctx: AcademyContext, paymentId: string) => load(and(e
 
 /** Área do aluno: só recibos de pagamentos do próprio vínculo. */
 export const getOwnReceipt = (ctx: StudentContext, paymentId: string) =>
-  load(and(eq(payments.id, paymentId), eq(students.userId, ctx.userId), eq(students.status, "active")));
+  load(and(eq(payments.id, paymentId), ownsOrGuards(ctx.userId), eq(students.status, "active")));
 
 export type Receipt = Awaited<ReturnType<typeof load>>;

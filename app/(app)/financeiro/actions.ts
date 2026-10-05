@@ -9,7 +9,7 @@ import { entryInput } from "@/lib/validation";
 import { cancelEntry, createEntry } from "@/services/finance";
 
 export async function createEntryAction(_: ActionState, form: FormData): Promise<ActionState> {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("financeiro");
   let done = false;
   const state = await handleForm(form, entryInput, async (data) => { await createEntry(ctx, data); done = true; });
   if (!done) return state;
@@ -18,7 +18,7 @@ export async function createEntryAction(_: ActionState, form: FormData): Promise
 }
 
 export async function cancelEntryAction(form: FormData) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("financeiro");
   const back = safeBack(form.get("back"), "/financeiro");
   try {
     await cancelEntry(ctx, String(form.get("id")));

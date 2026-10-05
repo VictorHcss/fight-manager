@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ConfirmSubmit, FilterToggle } from "@/components/client";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { formatDate, isValidDate } from "@/lib/dates";
+import { formatDate, isValidDate, shortReference } from "@/lib/dates";
 import { FEE_STATUS_LABEL, type DisplayFeeStatus } from "@/lib/fee-status";
 import { formatMoney } from "@/lib/money";
 import { Pagination } from "@/components/Pagination";
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Mensalidades" };
 const STATUSES: DisplayFeeStatus[] = ["pending", "overdue", "paid", "canceled"];
 
 export default async function FeesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   const sp = await searchParams;
   const status = STATUSES.includes(sp.status as DisplayFeeStatus) ? (sp.status as DisplayFeeStatus) : undefined;
   const from = sp.de && isValidDate(sp.de) ? sp.de : undefined;
@@ -23,12 +23,14 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
   const filters = { status, from, to, q: sp.q };
   const page = pageFrom(sp.pagina);
   const [list, summary] = await Promise.all([listFees(ctx, filters, PAGE_SIZE, offsetOf(page)), feesSummary(ctx, filters)]);
-  const here = `/mensalidades?${new URLSearchParams(Object.entries(sp).filter(([k, v]) => v && k !== "ok" && k !== "erro") as [string, string][])}`;
+  const query = new URLSearchParams(Object.entries(sp).filter(([k, v]) => v && k !== "ok" && k !== "erro") as [string, string][]);
+  const here = `/mensalidades?${query}`;
+  query.delete("pagina");
 
   return (
     <>
       <PageHeader title="Mensalidades" description="Uma mensalidade fica atrasada a partir do dia seguinte ao vencimento."
-        actions={<><Link href="/mensalidades/gerar" className="btn">Gerar mensalidades do mês</Link><Link href="/mensalidades/nova" className="btn btn--primary">Nova mensalidade</Link></>} />
+        actions={<><a href={`/mensalidades/exportar?${query}`} className="btn btn--ghost" download>Exportar CSV</a><Link href="/mensalidades/gerar" className="btn">Gerar mensalidades do mês</Link><Link href="/mensalidades/nova" className="btn btn--primary">Nova mensalidade</Link></>} />
       {sp.erro && <Alert tone="danger">{sp.erro}</Alert>}
       <form className="filters" role="search">
         <label>Aluno<input name="q" type="search" defaultValue={sp.q} placeholder="Nome do aluno" /></label>
@@ -50,15 +52,15 @@ export default async function FeesPage({ searchParams }: { searchParams: Promise
             <tbody>{list.map((f) => (
               <tr key={f.id}>
                 <td className="primary"><Link href={`/alunos/${f.studentId}?aba=mensalidades`}>{f.studentName}</Link></td>
-                <td data-label="Referência">{f.reference}</td>
+                <td data-label="Referência">{shortReference(f.reference)}</td>
                 <td data-label="Vencimento">{formatDate(f.dueDate)}</td>
                 <td data-label="Situação"><Badge status={f.displayStatus}>{FEE_STATUS_LABEL[f.displayStatus]}</Badge>{f.paidCents > 0 && f.status === "pending" && <div className="small muted">{formatMoney(f.paidCents)} já pago</div>}</td>
                 <td data-label="Valor" className="num">{formatMoney(f.amountCents)}</td>
-                <td data-label="Em aberto" className="num">{f.status === "canceled" ? "–" : formatMoney(f.balanceCents)}</td>
+                <td data-label="Em aberto" className="num">{f.status === "canceled" || f.status === "paid" ? "–" : formatMoney(f.balanceCents)}</td>
                 <td>
                   {f.status === "pending" && (
                     <div className="row-actions">
-                      <Link className="btn btn--small btn--primary" href={`/pagamentos/novo?aluno=${f.studentId}&mensalidade=${f.id}`}>Registrar pagamento</Link>
+                      <Link className="btn btn--small btn--primary" href={`/pagamentos/novo?aluno=${f.studentId}&mensalidade=${f.id}`} aria-label={`Registrar pagamento de ${f.studentName}`}>Receber</Link>
                       {f.paidCents === 0 && <>
                         <Link className="btn btn--small" href={`/mensalidades/${f.id}/editar?back=${encodeURIComponent(here)}`}>Editar</Link>
                         <form action={cancelFeeAction}>

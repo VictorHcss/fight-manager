@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Card, PageHeader } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { currentReference } from "@/lib/dates";
+import { currentReferenceIn } from "@/lib/dates";
 import { GenerateForm } from "./GenerateForm";
 
 export const metadata: Metadata = { title: "Gerar mensalidades" };
 
 export default async function GeneratePage() {
-  await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   return (
     <>
       <PageHeader title="Gerar mensalidades do mês" />
@@ -19,7 +19,7 @@ export default async function GeneratePage() {
           <li>Depois de gerar, dá para editar ou cancelar cada mensalidade antes de registrar o pagamento.</li>
           <li>Se você gerar o mês atual depois do dia de vencimento de algum aluno, a mensalidade dele já aparece como atrasada.</li>
         </ul>
-        <GenerateForm reference={currentReference()} />
+        <GenerateForm reference={currentReferenceIn(ctx.timezone)} />
       </Card>
     </>
   );

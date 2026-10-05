@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, getTableColumns, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { fees, modalities, payments, students, type Student } from "@/db/schema";
-import { today } from "@/lib/dates";
+import { todayIn } from "@/lib/dates";
 import { DomainError, NotFoundError } from "@/lib/errors";
 import type { z } from "zod";
 import type { studentInput } from "@/lib/validation";
@@ -134,7 +134,7 @@ function studentConditions(ctx: AcademyContext, filters: StudentFilters) {
 
 /** Busca por nome, telefone ou e-mail (sem diferenciar maiúsculas), com filtro de status. */
 export async function listStudents(ctx: AcademyContext, filters: StudentFilters = {}, limit = 100, offset = 0) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
 
   return db.select({
     id: students.id, name: students.name, phone: students.phone, email: students.email, modality: modalities.name,
@@ -156,7 +156,7 @@ export async function countStudents(ctx: AcademyContext, filters: StudentFilters
 
 /** Situação financeira mostrada no perfil. */
 export async function studentFinancialSummary(ctx: AcademyContext, studentId: string) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
   const [row] = await db.select({
     overdueCount: sql<number>`count(*) filter (where ${fees.dueDate} < ${now})::int`,
     pendingCount: sql<number>`count(*)::int`,

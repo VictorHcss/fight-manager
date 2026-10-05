@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.10.2
+
+- **Teste instável corrigido.** O de recuperação de senha preenchia o formulário de login quando o servidor estava lento (as duas telas têm `#email`); agora espera a página nova.
+- **Testes por assunto.** Os arquivos `v08` a `v10b` viraram `lib`, `equipe`, `area-do-aluno` e `automacao-e-presenca`, e os antigos ganharam nomes em português. Saíram dois testes fracos de fuso que só rodavam perto da meia-noite (o fuso continua testado em `lib.test.ts`).
+- **Permissões testadas.** `tests/guardas.test.ts` lê o código e confere a guarda de toda tela, action e rota da academia (uma rota nova sem guarda quebra o teste). `tests/e2e/permissoes.spec.ts` confere no navegador o menu, os endereços bloqueados, a aba de saúde, a exportação e a mudança de acesso valendo na hora.
+- **CSS organizado.** O `globals.css` de 950 linhas virou 9 arquivos por área em `app/styles/`, e 42 regras repetidas foram unidas. Comparação pixel a pixel de 104 prints (claro e escuro, celular e computador) antes e depois.
+- **Layout no celular.** Tabelas viram cartões em duas colunas (metade da altura), a ação principal do cabeçalho ocupa a linha toda e as outras dividem a de baixo. Referências aparecem como "set/2026" em vez de "2026-09", e mensalidade paga mostra "–" em aberto.
+- Depois de salvar o acesso de alguém da equipe, o formulário fecha sozinho.
+
+## 0.10.0
+
+- **Tarefa diária** (`POST /api/tarefas/diarias` com `CRON_SECRET`, ou `npm run jobs:daily`): gera as mensalidades do mês sozinha (mensalidade cancelada não volta) e manda por e-mail o lembrete X dias antes do vencimento e o aviso no dia seguinte, com Pix copia e cola. Cada aviso sai uma vez só (`fee_reminders`). Configurável por academia em Configurações › Academia › Automação. No Docker Compose, o serviço `scheduler` chama a tarefa de hora em hora.
+- **Presença:** a equipe marca quem treinou (um toque por aluno), navega pelos dias e vê a lista de "sumidos há 14 dias" com atalho para o WhatsApp. Frequência dos últimos 30 dias no perfil do aluno e na área do aluno. Nova permissão "Presença".
+- **Área do responsável:** no perfil do aluno, "Dar acesso" ao responsável com e-mail cria a conta e envia o link para criar a senha. O responsável vê situação, Pix, histórico e recibos de cada dependente. A academia pode remover o acesso.
+- **Relatórios:** recebido × esperado por mês (gráfico e tabela), taxa de recebimento, atraso, alunos novos, recebimentos por modalidade e por forma de pagamento, em 3, 6 ou 12 meses (permissão Financeiro).
+- **PWA:** manifesto, ícones e atalhos; dá para instalar o sistema na tela inicial do celular.
+- Teste de ponta a ponta do pagamento parcial não depende mais do dia do mês.
+- Contas de teste: `responsavel@academia.dev`. 15 testes novos.
+
+## 0.9.0
+
+- **Equipe com permissões:** quem tem acesso total adiciona pessoas à equipe e escolhe, área por área, o que cada uma pode fazer (alunos, saúde, mensalidades, pagamentos, financeiro, solicitações, configurações, auditoria). O menu, a barra do celular e os botões se ajustam; páginas e ações conferem a permissão no servidor. Toda mudança de acesso vai para a auditoria.
+- **Pix copia e cola:** a academia cadastra a chave Pix e o aluno vê o QR Code e o código com o valor da próxima mensalidade (padrão BR Code do Banco Central, sem integração).
+- **Fuso horário por academia** (RNF16): Brasília, Amazonas, Acre ou Noronha; decide quando uma mensalidade fica atrasada.
+- **Confirmação de e-mail** nas contas criadas pelo aluno: link de 48 horas, aviso com reenvio na área do aluno e selo "confirmado / não confirmado" nas solicitações.
+- **Segurança e operação:** cabeçalhos de segurança (CSP, X-Frame-Options, HSTS em produção, Referrer-Policy, Permissions-Policy), exportações CSV registradas na auditoria, log de erros em JSON com aviso opcional por webhook, `GET /api/saude` para monitor de disponibilidade e backup diário do banco (serviço `backup` no Docker Compose, ver docs/instalacao.md).
+- Conta de teste nova: `recepcao@academia.dev` (acesso personalizado).
+- 13 testes novos (Pix, chave Pix, permissões, fuso, confirmação de e-mail).
+
+## 0.8.0
+
+- Plataforma: suspender e reativar academias pela tela (com confirmação, auditoria e encerramento das sessões), pesquisa, filtro por situação e indicador de academias sem administrador.
+- Academia: exportação em CSV das mensalidades e do financeiro, respeitando os filtros; menu da conta no avatar do celular; botões "Receber" nas listas; "Caixa do mês" no Início; avisos lado a lado no celular.
+- Aluno: situação e próximo pagamento num bloco só, contato da academia (WhatsApp e telefone), histórico unificado com recibos e a página "Minha conta" (telefone e troca de senha).
+- Visual: tema escuro automático (ficha e recibo continuam claros), cores fixas trocadas por tokens e menos estilos inline.
+- 6 testes novos (CSV, suspensão, telefone do aluno, contato da academia).
+
 ## 0.7.0 (contas, e-mail e novo visual)
 
 ### Adicionado
@@ -7,7 +44,7 @@
 - **Academia adiciona aluno que já tem conta** (Solicitações → "Adicionar aluno que já tem conta"), só pelo e-mail exato. Vira um pedido na mesma fila do convite: aprovar completando modalidade e mensalidade, ou vincular a um cadastro existente (sugerido quando o e-mail bate).
 - **Plataforma cria academias** pela interface: nome da academia, nome e e-mail do responsável. O responsável recebe um link de acesso (72 horas, uso único) para criar a senha; a tela mostra o link para copiar se o e-mail não estiver configurado. Botão "Novo link de acesso" por academia. Cadastro público de academias não existe.
 - **Convite por e-mail** em "Convidar alunos".
-- **Envio por SMTP** (Gmail, Outlook, Hostinger, Locaweb, Brevo, SES...), além do Resend. E-mails em texto e HTML. `EMAIL_PROVIDER` escolhe a forma de envio. Comando `npm run email:test -- destino@email.com`. Guia completo em `docs/email.md`.
+- **Envio por SMTP** (Gmail, Outlook, Hostinger, Locaweb, Brevo, SES...), além do Resend. E-mails em texto e HTML. `EMAIL_PROVIDER` escolhe a forma de envio. Comando `npm run email:test -- destino@email.com`. Guia completo em `docs/instalacao.md`.
 - **Contas de teste para todos os tipos de usuário** no seed (plataforma, academia, aluno aprovado, aluno aguardando aprovação e aluno sem academia), mostradas na tela de login em desenvolvimento ou com `SHOW_TEST_ACCOUNTS=true`, com preenchimento em um clique. Rodar o seed num banco antigo só acrescenta as contas que faltam.
 - **Início:** barra de arrecadação das mensalidades do mês (recebido de quanto era esperado).
 - Campo de senha com "Mostrar/Ocultar".
@@ -51,7 +88,7 @@
 - Testes de concorrência provando os locks (9 testes novos, 73 no total).
 - Testes de ponta a ponta com Playwright no projeto (7).
 - Lint (ESLint com as regras do Next.js) e integração contínua no GitHub Actions.
-- `docs/requisitos.md`: requisitos funcionais e não funcionais numerados, com o estado de cada um.
+- `docs/produto.md`: requisitos funcionais e não funcionais numerados, com o estado de cada um.
 
 ### Alterado
 - TypeScript fixado na 6.0 (o 7 ainda não é suportado pelo lint do Next.js).

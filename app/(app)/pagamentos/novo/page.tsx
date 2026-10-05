@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui";
 import { requireAcademyAdmin } from "@/lib/auth/guards";
-import { formatDate, today } from "@/lib/dates";
+import { formatDate, formatReference, todayIn } from "@/lib/dates";
 import { FEE_STATUS_LABEL } from "@/lib/fee-status";
 import { centsToInput, formatMoney } from "@/lib/money";
 import { isUuid } from "@/lib/page";
@@ -13,7 +13,7 @@ import { PaymentForm } from "../PaymentForm";
 export const metadata: Metadata = { title: "Registrar pagamento" };
 
 export default async function NewPaymentPage({ searchParams }: { searchParams: Promise<{ aluno?: string; mensalidade?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("pagamentos");
   const sp = await searchParams;
   const chosen = sp.aluno && isUuid(sp.aluno) ? await getStudent(ctx, sp.aluno).catch(() => null) : null;
   const studentId = chosen?.id ?? "";
@@ -28,10 +28,10 @@ export default async function NewPaymentPage({ searchParams }: { searchParams: P
         <PaymentForm
           student={chosen ? { id: chosen.id, name: chosen.name, modality: chosen.modality, phone: chosen.phone, email: chosen.email, status: chosen.status, overdue: summary?.overdueCount ?? 0, monthlyFeeCents: chosen.monthlyFeeCents } : null}
           fees={open.map((f) => ({ id: f.id, balance: centsToInput(f.balanceCents),
-            label: `${f.reference}, vence ${formatDate(f.dueDate)} (${FEE_STATUS_LABEL[f.displayStatus].toLowerCase()}): ${formatMoney(f.balanceCents)} em aberto` }))}
+            label: `${formatReference(f.reference)}, vence ${formatDate(f.dueDate)} (${FEE_STATUS_LABEL[f.displayStatus].toLowerCase()}): ${formatMoney(f.balanceCents)} em aberto` }))}
           feeId={fee?.id ?? ""}
           amount={fee ? centsToInput(fee.balanceCents) : ""}
-          today={today()}
+          today={todayIn(ctx.timezone)}
         />
       </Suspense>
     </>

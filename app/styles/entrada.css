@@ -1,0 +1,76 @@
+/* Telas de entrada: login, criar conta, recuperar senha (e o alinhamento das grades de formulário). */
+
+/* login */
+
+.login-brand { margin-bottom: 1.2rem; }
+.login-foot { color: #9aa0ab; font-size: 0.85rem; text-align: center; margin: 0; }
+
+/* ---------------------------------------------------------------- telas de entrada */
+.auth { min-height: 100vh; display: grid; background: var(--surface); }
+@media (min-width: 960px) { .auth { grid-template-columns: minmax(380px, 44%) 1fr; } }
+.auth-side { display: none; position: relative; overflow: hidden; background: var(--brand); color: #fff; padding: 2.4rem clamp(2rem, 4vw, 3.6rem); }
+@media (min-width: 960px) { .auth-side { display: flex; flex-direction: column; } }
+.auth-side-brand { align-self: flex-start; }
+.auth-side-brand .brand-name { font-size: 1.1rem; }
+.auth-side-copy { margin-top: auto; margin-bottom: 2.2rem; max-width: 30ch; position: relative; z-index: 1; }
+.auth-side-title { margin: 0 0 1rem; font-size: clamp(2.6rem, 4.4vw, 3.8rem); line-height: 0.95; }
+.auth-side-text { margin: 0; color: #b5bac3; font-size: 1.02rem; line-height: 1.55; max-width: 38ch; }
+.auth-ropes { display: block; width: calc(100% + 2rem); height: 180px; margin: 0 -1rem -0.6rem; }
+.rope { fill: none; stroke-width: 7; stroke-linecap: round; }
+.rope--1 { stroke: var(--accent); }
+.rope--2 { stroke: #f2f3f5; }
+.rope--3 { stroke: var(--accent); }
+.rope-post { fill: #3a3e48; }
+.rope-pad { fill: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .rope { stroke-dasharray: 620; stroke-dashoffset: 620; animation: rope-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+  .rope--2 { animation-delay: 0.12s; }
+  .rope--3 { animation-delay: 0.24s; }
+}
+@keyframes rope-in { to { stroke-dashoffset: 0; } }
+
+.auth-main { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.2rem 3rem; background: var(--surface); }
+.auth-mobile-brand { width: 100%; max-width: 440px; margin-bottom: 1.8rem; }
+@media (min-width: 960px) { .auth-mobile-brand { display: none; } }
+.auth-panel { width: 100%; max-width: 420px; text-align: left; }
+.auth-panel--wide { max-width: 560px; }
+.auth-title { font-size: clamp(2.1rem, 7vw, 2.6rem); line-height: 1; margin: 0 0 0.6rem; }
+.auth-lead { color: var(--muted); margin: 0 0 1.6rem; line-height: 1.55; max-width: 52ch; }
+.auth-footer { margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.93rem; }
+.auth-footer a, .auth-switch a, .auth-note a, .link-inline { color: var(--accent-strong); font-weight: 650; text-decoration: none; }
+.auth-footer a:hover, .auth-switch a:hover, .auth-note a:hover, .link-inline:hover { text-decoration: underline; }
+.auth-footer-sep { display: inline-block; width: 4px; height: 4px; margin: 0 0.7rem; border-radius: 50%; background: var(--line-strong); vertical-align: middle; }
+.auth-switch { margin: 1.1rem 0 0; font-size: 0.9rem; }
+.auth-note { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.3rem 1rem; margin-bottom: 1.4rem; padding: 0.75rem 1rem; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--line); font-size: 0.92rem; }
+.auth .alert { margin-bottom: 1rem; }
+form.inline { display: inline; }
+.link-inline { border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
+
+/* contas de teste (desenvolvimento) */
+.test-accounts { margin-top: 1.8rem; padding: 1rem; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); background: var(--surface-2); }
+.test-accounts h2 { font-size: 0.95rem; font-weight: 750; margin: 0 0 0.2rem; }
+.test-accounts > p { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.85rem; }
+.test-accounts code { font-size: 0.85em; padding: 0.05rem 0.35rem; border-radius: 5px; background: #fff; border: 1px solid var(--line); }
+.test-accounts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.test-accounts button { display: grid; width: 100%; gap: 0.05rem; padding: 0.6rem 0.8rem; text-align: left; border: 1px solid var(--line); border-radius: 9px; background: #fff; cursor: pointer; font: inherit; color: var(--ink); }
+.test-accounts button:hover { border-color: var(--accent); }
+.test-accounts button strong { font-size: 0.9rem; }
+.test-accounts button span { font-size: 0.84rem; color: var(--accent-strong); font-weight: 600; }
+.test-accounts button small { font-size: 0.78rem; color: var(--muted); }
+
+/* criar conta: escolha de caminho (aluno) */
+.choice-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.choice { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius); text-decoration: none; background: #fff; }
+.choice:hover { border-color: var(--accent); }
+.choice-icon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-strong); }
+.choice-text { display: grid; gap: 0.1rem; }
+.choice-text span { color: var(--muted); font-size: 0.9rem; }
+
+@media print {
+  .app-header, .auth-side { display: none !important; }
+}
+
+/* ajustes de alinhamento */
+.form-grid, .form-grid--3 { align-items: start; }
+
+@media (min-width: 960px) { .auth-side { position: sticky; top: 0; height: 100vh; align-self: start; } }

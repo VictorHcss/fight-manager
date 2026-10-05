@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AddressFields } from "@/components/AddressFields";
-import { MoneyInput, Submit } from "@/components/client";
+import { MoneyInput, PasswordInput, Submit } from "@/components/client";
+import { BRAZIL_TIMEZONES } from "@/lib/dates";
+import { ALL_PERMISSIONS, PERMISSIONS, type Permission } from "@/lib/permissions";
 import { Alert, Field } from "@/components/ui";
-import { changePasswordAction, createUserAction, saveModalityAction, updateAcademyAction, updateTermsAction } from "./actions";
+import { changePasswordAction, createUserAction, updatePermissionsAction, saveModalityAction, updateAcademyAction, updateTermsAction } from "./actions";
 
 export function PasswordForm() {
   const [state, action] = useActionState(changePasswordAction, {});
@@ -20,19 +22,70 @@ export function PasswordForm() {
   );
 }
 
+/**
+ * Escolha do acesso: "total" (vê tudo e gerencia a equipe) ou "personalizado" (só as áreas marcadas).
+ * Os nomes perm_<chave> são lidos no servidor por permissionsFromForm.
+ */
+export function PermissionPicker({ idPrefix, initial }: { idPrefix: string; initial: readonly Permission[] | null }) {
+  const [custom, setCustom] = useState(initial !== null);
+  const [chosen, setChosen] = useState<Set<Permission>>(new Set(initial ?? ["alunos", "pagamentos"]));
+  const toggle = (p: Permission) => setChosen((old) => {
+    const next = new Set(old);
+    if (next.has(p)) { next.delete(p); if (p === "alunos") next.delete("saude"); } else { next.add(p); if (p === "saude") next.add("alunos"); }
+    return next;
+  });
+  return (
+    <fieldset className="access-picker">
+      <legend>O que a pessoa pode fazer</legend>
+      <div className="access-modes">
+        <label className={`access-mode${!custom ? " is-on" : ""}`}>
+          <input type="radio" name="access" value="full" checked={!custom} onChange={() => setCustom(false)} />
+          <span><strong>Acesso total</strong><small>Vê tudo e gerencia a equipe, como você.</small></span>
+        </label>
+        <label className={`access-mode${custom ? " is-on" : ""}`}>
+          <input type="radio" name="access" value="custom" checked={custom} onChange={() => setCustom(true)} />
+          <span><strong>Personalizado</strong><small>Escolha as áreas que ela vai usar.</small></span>
+        </label>
+      </div>
+      {custom && (
+        <div className="perm-grid">
+          {ALL_PERMISSIONS.map((p) => (
+            <label key={p} className="perm" htmlFor={`${idPrefix}-${p}`}>
+              <input id={`${idPrefix}-${p}`} type="checkbox" name={`perm_${p}`} checked={chosen.has(p)} onChange={() => toggle(p)} />
+              <span><strong>{PERMISSIONS[p].label}</strong><small>{PERMISSIONS[p].hint}</small></span>
+            </label>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 export function NewUserForm() {
   const [state, action] = useActionState(createUserAction, {});
   const e = state.errors ?? {};
   const v = state.values ?? {};
   return (
-    <form action={action} className="form">
+    <form action={action} className="form" noValidate>
       {state.message && <Alert tone="danger">{state.message}</Alert>}
       <div className="form-grid">
         <Field label="Nome" name="name" error={e.name}><input id="name" name="name" defaultValue={v.name} required /></Field>
-        <Field label="E-mail" name="email" error={e.email}><input id="email" name="email" type="email" defaultValue={v.email} required /></Field>
-        <div className="span-2"><Field label="Senha inicial" name="password" error={e.password} hint="Pelo menos 10 caracteres. Peça para a pessoa trocar no primeiro acesso."><input id="password" name="password" type="password" autoComplete="new-password" required /></Field></div>
+        <Field label="E-mail (login)" name="email" error={e.email}><input id="email" name="email" type="email" defaultValue={v.email} required /></Field>
+        <div className="span-2"><Field label="Senha inicial" name="password" error={e.password} hint="Pelo menos 10 caracteres. Peça para a pessoa trocar no primeiro acesso."><PasswordInput id="password" name="password" autoComplete="new-password" /></Field></div>
       </div>
-      <div className="form-actions"><Submit>Criar administrador</Submit></div>
+      <PermissionPicker idPrefix="novo" initial={v.access === "full" ? null : ["alunos", "pagamentos"]} />
+      <div className="form-actions"><Submit>Adicionar à equipe</Submit></div>
+    </form>
+  );
+}
+
+export function PermissionsForm({ id, initial }: { id: string; initial: readonly Permission[] | null }) {
+  const [state, action] = useActionState(updatePermissionsAction.bind(null, id), {});
+  return (
+    <form action={action} className="form">
+      {state.message && <Alert tone="danger">{state.message}</Alert>}
+      <PermissionPicker idPrefix={`u-${id}`} initial={initial} />
+      <div className="form-actions"><Submit>Salvar acesso</Submit></div>
     </form>
   );
 }
@@ -49,6 +102,30 @@ export function AcademyForm({ initial }: { initial: Record<string, string | null
         <Field label="CPF ou CNPJ (opcional)" name="document" error={e.document} hint="Sai na ficha de matrícula, como identificação da academia."><input id="document" name="document" defaultValue={v.document ?? ""} inputMode="numeric" /></Field>
         <Field label="Telefone ou WhatsApp" name="phone" error={e.phone}><input id="phone" name="phone" defaultValue={v.phone ?? ""} inputMode="tel" /></Field>
         <Field label="E-mail" name="email" error={e.email}><input id="email" name="email" type="email" defaultValue={v.email ?? ""} /></Field>
+        <Field label="Fuso horário" name="timezone" error={e.timezone} hint="Decide a partir de quando uma mensalidade conta como atrasada.">
+          <select id="timezone" name="timezone" defaultValue={v.timezone ?? "America/Sao_Paulo"}>{BRAZIL_TIMEZONES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        </Field>
+      </div>
+      <h3 className="form-section">Recebimento por Pix</h3>
+      <div className="form-grid">
+        <div className="span-2">
+          <Field label="Chave Pix (opcional)" name="pixKey" error={e.pixKey} hint="CPF, CNPJ, e-mail, celular com DDD ou chave aleatória. Com ela, o aluno vê o Pix copia e cola e o QR Code com o valor da mensalidade.">
+            <input id="pixKey" name="pixKey" defaultValue={v.pixKey ?? ""} autoComplete="off" spellCheck={false} />
+          </Field>
+        </div>
+      </div>
+      <h3 className="form-section">Automação</h3>
+      <div className="toggle-list">
+        <label className="toggle"><input type="checkbox" name="autoGenerateFees" defaultChecked={v.autoGenerateFees !== "false"} />
+          <span><strong>Gerar as mensalidades do mês sozinho</strong><small>No dia 1, para todos os alunos ativos. Mensalidade cancelada não volta.</small></span></label>
+        <label className="toggle"><input type="checkbox" name="overdueReminder" defaultChecked={v.overdueReminder !== "false"} />
+          <span><strong>Avisar por e-mail no dia seguinte ao vencimento</strong><small>Só para quem ainda está em aberto.</small></span></label>
+        <Field label="Lembrete antes do vencimento" name="reminderDaysBefore" error={e.reminderDaysBefore} hint="Vai para o responsável principal (menores) ou para o aluno, com o Pix copia e cola quando houver chave.">
+          <select id="reminderDaysBefore" name="reminderDaysBefore" defaultValue={v.reminderDaysBefore ?? "3"}>
+            <option value="0">Não enviar</option>
+            {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d} dia{d > 1 ? "s" : ""} antes</option>)}
+          </select>
+        </Field>
       </div>
       <h3 className="form-section">Endereço</h3>
       <AddressFields values={v} errors={e} />

@@ -76,8 +76,10 @@ export async function joinWithInvite(userId: string, token: string, consent: boo
  * (sem conta) que parecem ser a mesma pessoa: mesmo e-mail ou mesmo telefone.
  */
 export async function listRequests(ctx: AcademyContext) {
-  const pending = await db.select().from(students)
-    .where(and(eq(students.academyId, ctx.academyId), eq(students.status, "pending"))).orderBy(students.createdAt);
+  const pending = (await db.select({ s: students, emailVerifiedAt: users.emailVerifiedAt }).from(students)
+    .leftJoin(users, eq(users.id, students.userId))
+    .where(and(eq(students.academyId, ctx.academyId), eq(students.status, "pending"))).orderBy(students.createdAt))
+    .map((r) => ({ ...r.s, emailVerified: !!r.emailVerifiedAt }));
   if (!pending.length) return [];
 
   const emails = pending.map((p) => p.email?.toLowerCase()).filter(Boolean) as string[];

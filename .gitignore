@@ -1,30 +1,16 @@
-# Dependencies
 node_modules/
-
-# Next.js
 .next/
 out/
-next-env.d.ts
-
-# Environment variables
 .env
-.env.*
-!.env.example
-
-# PostgreSQL
-pgdata/
-
-# Logs
+.env.local
 *.log
-
-# Tests
 coverage/
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
 playwright-report/
 test-results/
-
-# TypeScript
-*.tsbuildinfo
-
-# Local files
-.DS_Store
 .outbox/
+
+# backups do banco (scripts/backup.sh)
+/backups

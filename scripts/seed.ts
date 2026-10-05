@@ -4,9 +4,9 @@
  * Não use em produção: as senhas são conhecidas.
  */
 import "./load-env";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { academies, modalities, students, users } from "../db/schema";
+import { academies, attendances, guardians, modalities, students, users } from "../db/schema";
 import { hashPassword } from "../lib/auth/password";
 import { consentText } from "../lib/consent";
 import { TEST_ACCOUNTS, TEST_PASSWORD } from "../lib/test-accounts";
@@ -33,7 +33,7 @@ async function main() {
     const created = await ensureStudentAccounts(exists.academyId!, exists.id);
     console.log(created.length
       ? `Dados de desenvolvimento já existiam. Contas de teste adicionadas: ${created.join(", ")}.`
-      : "Dados de desenvolvimento já existem. Para recriar, resete o banco (ver docs/setup.md).");
+      : "Dados de desenvolvimento já existem. Para recriar, resete o banco (ver docs/instalacao.md).");
     printAccounts();
     return;
   }
@@ -159,6 +159,47 @@ async function ensureStudentAccounts(academyId: string, adminId: string): Promis
     });
     created.push("semacademia@academia.dev");
   }
+
+  // equipe com acesso personalizado: atende a recepção (alunos, mensalidades e pagamentos), sem financeiro nem saúde
+  if (!(await has("recepcao@academia.dev"))) {
+    await db.insert(users).values({
+      academyId, role: "ACADEMY_ADMIN", name: "Camila Duarte", email: "recepcao@academia.dev", passwordHash: await hashPassword(PASSWORD),
+      permissions: ["alunos", "mensalidades", "pagamentos", "solicitacoes"], emailVerifiedAt: new Date(),
+    });
+    created.push("recepcao@academia.dev");
+  }
+
+  // responsável com acesso: Juliana Souza (mãe dos irmãos do exemplo) vê os dependentes na área do responsável
+  if (!(await has("responsavel@academia.dev"))) {
+    const [mother] = await db.select({ id: guardians.id }).from(guardians).where(and(eq(guardians.academyId, academyId), eq(guardians.name, "Juliana Souza")));
+    if (mother) {
+      const [u] = await db.insert(users).values({ academyId: null, role: "STUDENT", name: "Juliana Souza", email: "responsavel@academia.dev", phone: "(33) 99877-6655", passwordHash: await hashPassword(PASSWORD), emailVerifiedAt: new Date() }).returning();
+      await db.update(guardians).set({ userId: u.id }).where(eq(guardians.id, mother.id));
+      created.push("responsavel@academia.dev");
+    }
+  }
+
+  // presenças de exemplo nos últimos 30 dias (alguns alunos sumidos, para a lista "Sumidos")
+  const [{ n: hasAttendance }] = await db.select({ n: sql<number>`count(*)::int` }).from(attendances).where(eq(attendances.academyId, academyId));
+  if (!hasAttendance) {
+    const active = await db.select({ id: students.id }).from(students).where(and(eq(students.academyId, academyId), eq(students.status, "active")));
+    const base = today();
+    const rows: { academyId: string; studentId: string; date: string }[] = [];
+    active.forEach((st, i) => {
+      const lastDay = i % 4 === 3 ? 20 : 0; // um em cada quatro está sem treinar há 20 dias
+      for (let d = lastDay; d < 30; d += 2 + (i % 3)) {
+        const [y, m, dd] = base.split("-").map(Number);
+        rows.push({ academyId, studentId: st.id, date: new Date(Date.UTC(y, m - 1, dd - d)).toISOString().slice(0, 10) });
+      }
+    });
+    if (rows.length) await db.insert(attendances).values(rows).onConflictDoNothing();
+  }
+
+  // chave Pix de exemplo (CPF de teste válido) para mostrar o Pix copia e cola na área do aluno
+  await db.update(academies).set({ pixKey: "52998224725" }).where(and(eq(academies.id, academyId), isNull(academies.pixKey)));
+  // contas de exemplo já confirmadas, menos o pedido pendente (mostra o aviso "e-mail não confirmado")
+  await db.update(users).set({ emailVerifiedAt: new Date() })
+    .where(and(isNull(users.emailVerifiedAt), inArray(users.email, ["aluno@academia.dev", "semacademia@academia.dev", "admin@academia.dev", "plataforma@fightmanager.dev"])));
   return created;
 }
 

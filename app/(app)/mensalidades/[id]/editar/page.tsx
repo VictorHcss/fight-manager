@@ -12,7 +12,7 @@ import { FeeForm } from "../../FeeForm";
 export const metadata: Metadata = { title: "Editar mensalidade" };
 
 export default async function EditFeePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("mensalidades");
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const back = safeBack((await searchParams).back ?? null, "/mensalidades");

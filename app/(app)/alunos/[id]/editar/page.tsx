@@ -13,7 +13,7 @@ import { StudentForm } from "../../StudentForm";
 export const metadata: Metadata = { title: "Editar aluno" };
 
 export default async function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requireAcademyAdmin();
+  const ctx = await requireAcademyAdmin("alunos");
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const s = await orNotFound(getStudent(ctx, id));

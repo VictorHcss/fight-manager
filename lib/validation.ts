@@ -3,6 +3,8 @@
  * como chegam dos formulários, e devolvem dados tipados ou mensagens em português.
  */
 import { z } from "zod";
+import { isBrazilTimezone } from "./dates";
+import { ALL_PERMISSIONS, type Permission } from "./permissions";
 import { isValidDate, isValidReference, today } from "./dates";
 import { formatCpf, isValidCnpj, isValidCpf } from "./cpf";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "./labels";
@@ -105,7 +107,34 @@ export const academyInput = z.object({
   phone,
   email,
   ...addressFields,
+  timezone: z.string().optional().transform((v) => v || "America/Sao_Paulo").refine(isBrazilTimezone, "Escolha um fuso da lista."),
+  autoGenerateFees: z.string().optional().transform((v) => v === "on"),
+  overdueReminder: z.string().optional().transform((v) => v === "on"),
+  reminderDaysBefore: z.string().optional().transform((v) => (v && v !== "0" ? Number(v) : null))
+    .refine((v) => v === null || [1, 2, 3, 5, 7].includes(v), "Escolha uma opção da lista."),
+  pixKey: z.string().trim().optional().transform((v) => (v ? normalizePixKey(v) : null))
+    .refine((v) => v === null || v.length > 0, "Chave Pix inválida. Use CPF, CNPJ, e-mail, celular com DDD ou a chave aleatória."),
 });
+
+/**
+ * Normaliza a chave Pix como o Banco Central espera no código "copia e cola":
+ * CPF/CNPJ só com números, celular como +55DDDNÚMERO, e-mail em minúsculas e chave aleatória (UUID) como está.
+ * Devolve "" se não reconhecer o formato.
+ */
+export function normalizePixKey(raw: string): string {
+  const v = raw.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return v.toLowerCase();
+  if (v.includes("@")) return z.email().safeParse(v.toLowerCase()).success && v.length <= 77 ? v.toLowerCase() : "";
+  const digits = v.replace(/\D/g, "");
+  if (v.startsWith("+") || /[()\s]/.test(v)) {
+    const local = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
+    return local.length === 10 || local.length === 11 ? `+55${local}` : "";
+  }
+  if (digits.length === 11 && isValidCpf(digits)) return digits;
+  if (digits.length === 14 && isValidCnpj(digits)) return digits;
+  if (digits.length === 11 || digits.length === 13) return `+55${digits.length === 13 ? digits.slice(2) : digits}`; // celular sem formatação
+  return "";
+}
 
 export const modalityInput = z.object({
   name: requiredText("o nome da modalidade", 60),
@@ -154,6 +183,19 @@ export const userInput = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email("E-mail inválido.")),
   password: z.string().min(10, "A senha precisa ter pelo menos 10 caracteres.").max(200),
 });
+
+/**
+ * Permissões vindas do formulário da equipe: "access" = "full" (acesso total) ou "custom"
+ * com uma caixa "perm_<chave>" para cada permissão. Dados de saúde exigem acesso a alunos.
+ * Devolve null para acesso total, a lista para acesso personalizado, ou um erro.
+ */
+export function permissionsFromForm(form: FormData): { permissions: Permission[] | null } | { error: string } {
+  if (form.get("access") !== "custom") return { permissions: null };
+  const chosen = ALL_PERMISSIONS.filter((p) => form.get(`perm_${p}`) === "on");
+  if (chosen.includes("saude") && !chosen.includes("alunos")) chosen.unshift("alunos");
+  if (!chosen.length) return { error: "Marque pelo menos uma área que a pessoa pode acessar." };
+  return { permissions: chosen };
+}
 
 export const passwordChangeInput = z.object({
   current: z.string().min(1, "Informe a senha atual."),
@@ -238,3 +280,9 @@ export function inviteTokenFrom(input: string): string | null {
   const token = fromLink ? fromLink[1] : value;
   return /^[A-Za-z0-9_-]{16,40}$/.test(token) ? token : null;
 }
+
+/** Área do aluno: o próprio aluno atualiza o telefone de contato (vai para todas as academias dele). */
+export const ownContactInput = z.object({
+  phone: z.string().trim().min(1, "Informe seu telefone.")
+    .refine((v) => /^[\d\s()+-]{8,20}$/.test(v) && v.replace(/\D/g, "").length >= 10, "Telefone inválido. Inclua o DDD."),
+});

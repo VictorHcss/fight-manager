@@ -2,7 +2,7 @@
 
 Este guia explica o Fight Manager por inteiro: o problema que ele resolve, como o código está organizado, por que cada decisão foi tomada, o que deu errado no caminho e como apresentar o projeto. Ele foi escrito para ser lido com o código aberto ao lado.
 
-**Versão do projeto:** 0.6.0
+**Versão do projeto:** 0.10.0. A parte 1 (seções 1 a 18) explica a base, até a 0.6; a parte 2 (seção 19) explica o que entrou da 0.8 à 0.10, com diagrama e exercícios.
 
 ---
 
@@ -26,6 +26,7 @@ Este guia explica o Fight Manager por inteiro: o problema que ele resolve, como 
 16. [Roteiro de estudo, com exercícios](#16-roteiro-de-estudo-com-exercícios)
 17. [Roteiro de apresentação](#17-roteiro-de-apresentação)
 18. [Glossário](#18-glossário)
+19. [Parte 2: o que entrou da 0.8 à 0.10](#19-parte-2-o-que-entrou-da-08-à-010)
 
 ---
 
@@ -145,7 +146,7 @@ fight-manager/
 ├── drizzle/                      migrations SQL geradas
 ├── scripts/                      migrate, seed (dados de exemplo), create-admin
 ├── tests/                        testes automatizados; tests/e2e/ = ponta a ponta
-├── docs/                         documentação técnica (inclui requisitos.md)
+├── docs/                         documentação técnica (arquitetura, instalação, produto, changelog)
 ├── .github/workflows/ci.yml      integração contínua
 ├── Dockerfile, docker-compose.yml, .env.example
 └── package.json, tsconfig.json, eslint.config.mjs, vitest.config.ts, playwright.config.ts
@@ -364,7 +365,7 @@ const [fee] = await tx.select().from(fees)
 
 Não existe no código uma função que busque um aluno "só pelo ID". Se um administrador de A abrir `/alunos/{id-de-um-aluno-de-B}`, o serviço não encontra, e a tela mostra "não encontrado", exatamente como para um ID inexistente. Os IDs são UUID, então nem dá para adivinhar.
 
-**Onde estudar:** `services/context.ts` e o teste "isolamento entre academias" em `tests/business.test.ts`.
+**Onde estudar:** `services/context.ts` e o teste "isolamento entre academias" em `tests/alunos-e-financeiro.test.ts`.
 
 ### 8.2 Dinheiro em centavos, nunca em ponto flutuante
 
@@ -435,7 +436,7 @@ async function lockedFee(tx: Tx, ctx: AcademyContext, id: string) {
 
 Os locks estão em 8 pontos: mensalidade ao pagar, pagamento ao cancelar e ao confirmar, convite ao ser usado, pedido de entrada ao aprovar, aluno ao vincular a conta, lançamento ao cancelar, pedido de nova senha ao redefinir e aluno ao eliminar os dados.
 
-**E está provado:** `tests/hardening.test.ts` dispara operações **simultâneas** contra o banco real. Dois pagamentos de R$ 100 numa mensalidade de R$ 150, e só um passa; dez pagamentos de R$ 10 numa de R$ 50, e exatamente cinco passam.
+**E está provado:** `tests/concorrencia-e-seguranca.test.ts` dispara operações **simultâneas** contra o banco real. Dois pagamentos de R$ 100 numa mensalidade de R$ 150, e só um passa; dez pagamentos de R$ 10 numa de R$ 50, e exatamente cinco passam.
 
 ### 8.6 Validação no servidor, em três camadas
 
@@ -645,20 +646,26 @@ flowchart TB
 - **Testes automatizados** (`tests/*.test.ts`, Vitest) chamam os serviços diretamente, contra um **PostgreSQL de verdade** (não um banco falso). Cada teste cria a própria academia, e por isso os testes não interferem uns nos outros.
 - **Testes de ponta a ponta** (`tests/e2e/`, Playwright) abrem um navegador de verdade no build de produção e fazem o que uma pessoa faria.
 
-| Arquivo | O que prova |
+| Arquivo | O que testa |
 | --- | --- |
-| `money-and-dates.test.ts` | Centavos exatos, fuso de Brasília, atraso, último dia do mês, mensagens de validação |
-| `business.test.ts` | Alunos, isolamento entre academias, mensalidades, pagamentos, financeiro, totais |
-| `auth.test.ts` | Hash de senha, login, bloqueios |
-| `enrollment.test.ts` | Convite, cadastro, aprovação, vínculo, recusa, área do aluno |
-| `registration.test.ts` | CPF/CNPJ, modalidades, menores, irmãos, saúde, configuração inicial |
-| `hardening.test.ts` | Totais sobre o filtro inteiro, paginação, consentimento, sessões, **concorrência** |
-| `titular.test.ts` | Recuperação de senha, valor por extenso, recibo, exportação e eliminação |
+| `lib.test.ts` | Funções puras, sem banco: centavos, datas e fuso, validações, CSV, Pix copia e cola, chave Pix e permissões |
+| `alunos-e-financeiro.test.ts` | Cadastro e pesquisa de alunos, isolamento entre academias, mensalidades, pagamentos e financeiro |
+| `cadastro.test.ts` | CPF e CNPJ, modalidades, menores e responsáveis, irmãos, saúde restrita, configuração inicial |
+| `convites.test.ts` | Convite, cadastro pelo convite, aprovação, vínculo, recusa e visão do aluno |
+| `contas.test.ts` | Conta de aluno sem academia, academia adicionando pelo e-mail, academia criada pela plataforma |
+| `login.test.ts` | Hash de senha, login, usuário inativo, academia suspensa e limite de tentativas |
+| `concorrencia-e-seguranca.test.ts` | Totais do filtro inteiro, paginação, consentimento, sessões e operações simultâneas |
+| `senha-recibo-e-lgpd.test.ts` | Recuperação de senha, valor por extenso, recibo, exportação e eliminação de dados |
+| `equipe.test.ts` | Suspender e reativar academias, permissões da equipe |
+| `area-do-aluno.test.ts` | Telefone do aluno, contato da academia, confirmação de e-mail, área do responsável |
+| `automacao-e-presenca.test.ts` | Tarefa diária (geração automática e lembretes, com data fixa) e presença |
+| `guardas.test.ts` | Lê o código e confere que toda tela, action e rota da academia chama a guarda com a permissão certa |
+| `e2e/*.spec.ts` | No navegador: login, pagamento, convite, contas, celular, senha e recibo, e permissões da recepção |
 
 ### Como um teste de concorrência funciona
 
 ```ts
-// tests/hardening.test.ts (resumido)
+// tests/concorrencia-e-seguranca.test.ts (resumido)
 const results = await Promise.allSettled([
   createPayment(ctx, pay(s.id, fee.id, 10000)),   // R$ 100
   createPayment(ctx, pay(s.id, fee.id, 10000)),   // R$ 100, ao mesmo tempo
@@ -770,7 +777,7 @@ Toda decisão tem um preço. Saber dizer o preço mostra maturidade.
 
 ## 15. Limitações e próximos passos
 
-O estado de cada requisito está em `docs/requisitos.md`. As limitações mais relevantes:
+O estado de cada requisito está em `docs/produto.md`. As limitações mais relevantes:
 
 - **Docker não testado** no ambiente em que o projeto foi desenvolvido (o arquivo está pronto).
 - **Um fuso horário para todo o sistema:** uma academia em Manaus veria atrasos uma hora antes.
@@ -802,17 +809,17 @@ Sugestão de 7 etapas. Faça os exercícios num branch do Git e rode `npm test` 
 
 ### Etapa 4: dinheiro e datas
 
-- Leia `lib/money.ts`, `lib/dates.ts` e `tests/money-and-dates.test.ts`.
+- Leia `lib/money.ts`, `lib/dates.ts` e `tests/lib.test.ts`.
 - **Exercício:** no console do Node, rode `0.1 + 0.2` e depois `parseMoney("0,10") + parseMoney("0,20")`. Explique a diferença.
 
 ### Etapa 5: uma regra de ponta a ponta
 
 - Siga a seção 6 com o código aberto.
-- **Exercício:** crie a regra "o pagamento não pode ter data no futuro". Faça isso em três lugares: a validação (`lib/validation.ts`), uma mensagem em português e um teste novo em `tests/business.test.ts`.
+- **Exercício:** crie a regra "o pagamento não pode ter data no futuro". Faça isso em três lugares: a validação (`lib/validation.ts`), uma mensagem em português e um teste novo em `tests/alunos-e-financeiro.test.ts`.
 
 ### Etapa 6: concorrência
 
-- Leia `tests/hardening.test.ts` e a seção 8.5.
+- Leia `tests/concorrencia-e-seguranca.test.ts` e a seção 8.5.
 - **Exercício:** em `services/fees.ts`, tire temporariamente o `.for("update")` de `lockedFee` e rode `npm test`. Veja o teste de concorrência falhar, entenda por quê e coloque de volta.
 
 ### Etapa 7: interface
@@ -900,3 +907,196 @@ Seja honesto. Uma boa resposta mostra que você entende e defende cada decisão:
 | **Transação** | Grupo de operações no banco tratado como uma unidade. |
 | **UUID** | Identificador aleatório de 128 bits, impossível de adivinhar. |
 | **Validação** | Conferência de que um dado está correto antes de usá-lo. |
+
+## 19. Parte 2: o que entrou da 0.8 à 0.10
+
+Esta parte explica o código das versões 0.8 a 0.10, na ordem em que vale aprender: primeiro o caminho de uma requisição, depois cada peça. Leia com o projeto aberto e abra cada arquivo citado ao lado do texto. Em quase todo arquivo, o comentário no topo diz por que ele existe: leia o comentário antes do código.
+
+Ordem sugerida, uma etapa por sessão de estudo:
+
+1. O caminho de uma requisição (19.1).
+2. Conceitos do Next.js (19.2): Server Components, Server Actions e Route Handlers são o que mais aparece.
+3. Banco com Drizzle (19.3).
+4. Autenticação e permissões (19.4): a peça que protege todas as outras.
+5. Funcionalidades, uma por vez (19.5): comece pelo CSV e termine pela tarefa diária.
+6. Testes (19.8): rode um, quebre o código de propósito e veja ele falhar.
+7. Exercícios (19.9): o estudo só fixa quando você muda o código sozinho.
+
+### 19.1 O caminho de uma requisição
+
+Toda requisição atravessa as mesmas camadas na mesma ordem. O exemplo segue um clique em "Marcar" na tela de presença.
+
+```mermaid
+flowchart TD
+    A["<b>Navegador</b><br/>a pessoa clica em Marcar na tela de presença<br/>e o formulário envia para uma Server Action"]
+    B["<b>Tela, action ou rota (pasta app/)</b><br/>togglePresenceAction em app/(app)/presenca/actions.ts<br/>lê o FormData e confere a data"]
+    C{"<b>Guarda (lib/auth/guards.ts)</b><br/>requireAcademyAdmin('presenca')<br/>logado? da academia? academia ativa? tem a permissão?"}
+    D["<b>Serviço (pasta services/)</b><br/>setPresence em services/attendance.ts<br/>aluno ativo e desta academia (filtro por academyId)"]
+    E["<b>Banco (db/schema.ts + Drizzle)</b><br/>insert em attendances com onConflictDoNothing()<br/>índice único por aluno e dia"]
+    X["<b>Sem permissão</b><br/>volta para firstArea()<br/>com um aviso no topo da tela"]
+    A --> B --> C
+    C -- sim --> D --> E
+    C -- não --> X
+```
+
+Depois que o banco grava, a action chama `revalidatePath("/presenca")` e a tela é desenhada de novo com o aluno marcado.
+
+| Pasta | O que mora lá |
+| --- | --- |
+| `app/` | Telas (`page.tsx`), Server Actions (`actions.ts`) e rotas (`route.ts`). Cada pasta é uma URL. |
+| `components/` | Peças de tela reaproveitadas: o menu (`Shell.tsx`), cartões, botões de confirmação. |
+| `lib/` | Funções puras e infraestrutura: datas, dinheiro, Pix, permissões, validação, e-mail, autenticação. |
+| `services/` | A regra de negócio. Um arquivo por assunto, sempre recebendo o `ctx` de quem está agindo. |
+| `db/` e `drizzle/` | O schema do banco e as migrations geradas a partir dele. |
+| `tests/` | Testes com banco (`*.test.ts`) e de ponta a ponta (`e2e/`). |
+| `scripts/` | Seed, migrate, backup e a tarefa diária pelo terminal. |
+
+### 19.2 Conceitos do Next.js usados
+
+O projeto usa o App Router do Next.js 16: cada pasta dentro de `app/` vira uma URL, e quase tudo roda no servidor. Cinco conceitos explicam a maior parte do código.
+
+**Server Components (o padrão).** Todo `page.tsx` sem `"use client"` roda no servidor. Ele pode ser `async`, chamar o banco direto e devolver HTML pronto. Exemplo: `app/(app)/relatorios/page.tsx` faz `await academyReport(ctx, months)` e já desenha o gráfico. Nenhum JavaScript desse arquivo vai para o navegador.
+
+**Client Components (`"use client"`).** Só quando a tela precisa reagir no navegador: estado, cliques, `useState`. Exemplos: `components/CopyButton.tsx` (copia o Pix) e o `PermissionPicker` em `app/(app)/configuracoes/Forms.tsx` (marca e desmarca permissões). Regra prática: o componente começa no servidor e só vira cliente na parte que precisa.
+
+**Server Actions (`"use server"`).** Funções que rodam no servidor quando um formulário é enviado. O formulário aponta direto para a função: `<form action={togglePresenceAction}>`. Elas recebem um `FormData`, conferem a permissão, chamam um serviço e terminam com `revalidatePath` (atualiza a tela) ou `redirect`. Veja `app/(app)/presenca/actions.ts`, que tem só 15 linhas.
+
+**useActionState.** Liga um formulário cliente a uma Server Action e devolve o resultado (erros por campo, mensagem). É assim que o erro "Telefone inválido" aparece embaixo do campo em `app/aluno/conta/Forms.tsx`. A action devolve `{ errors, message, values }`, e o formulário reaparece com o que a pessoa digitou.
+
+**Route Handlers (`route.ts`).** Respondem a uma URL com algo que não é página: um arquivo CSV, um JSON. `app/(app)/mensalidades/exportar/route.ts` devolve o CSV; `app/api/tarefas/diarias/route.ts` recebe o POST do agendador; `app/api/saude/route.ts` responde se o banco está no ar.
+
+Dois detalhes que confundem no começo:
+
+- **Pastas entre parênteses não viram URL.** `app/(app)/presenca` responde em `/presenca`. O `(app)` só agrupa as telas que usam o mesmo `layout.tsx`, o menu lateral.
+- **`searchParams` e `params` são Promises.** Por isso o código faz `const sp = await searchParams` antes de ler `sp.dia`.
+
+### 19.3 Banco com Drizzle
+
+O banco é PostgreSQL, e o Drizzle é a camada que deixa escrever consultas em TypeScript com os tipos certos. Tudo começa em `db/schema.ts`: cada `pgTable` é uma tabela, e os tipos do resto do código saem dela.
+
+**Schema e migration.** Para mudar o banco, você edita o `schema.ts` e roda `npx drizzle-kit generate --name <nome>`. O Drizzle compara com a versão anterior e escreve o SQL em `drizzle/00NN_<nome>.sql`. As três desta parte: `0008` (permissões, fuso, Pix, confirmação de e-mail), `0009` (automação e lembretes) e `0010` (presença e conta do responsável). Abra a `0008`: no fim há um `UPDATE` escrito à mão, que marca as contas antigas como confirmadas. Migration gerada pode ser complementada.
+
+**Consultas.** A forma tipada é `db.select({...}).from(tabela).where(and(eq(...), ...))`. O `and(...)` ignora `undefined`, por isso dá para montar filtros opcionais assim: `q ? ilike(students.name, ...) : undefined` (veja `attendanceDay` em `services/attendance.ts`).
+
+**SQL bruto com `sql`.** Para o que o Drizzle não expressa bem (subconsultas, `count(*) filter (...)`, somas), use `` sql`...` ``. Os `${valor}` viram parâmetros seguros, não texto colado. Exemplo: o campo `overdue` em `services/reports.ts` soma só as mensalidades vencidas com `filter (where ...)`.
+
+**Transações.** `db.transaction(async (tx) => { ... })` garante que tudo dentro aconteça junto ou nada aconteça. `setAcademyActive` em `services/users.ts` suspende a academia, derruba as sessões e grava a auditoria numa transação só: se a auditoria falhar, a academia não fica suspensa pela metade.
+
+**Idempotência com índice único.** "Idempotente" é poder rodar de novo sem efeito duplicado. A presença tem índice único em (aluno, dia), e `onConflictDoNothing()` faz o segundo clique não criar uma segunda presença. Os lembretes usam a mesma ideia com `fee_reminders`.
+
+**A armadilha das colunas sem tabela.** Esta custou um teste falhando. Quando a consulta tem uma tabela só, o Drizzle escreve `"id"` em vez de `"students"."id"`. Dentro de uma subconsulta, esse `"id"` passa a apontar para a tabela de dentro. Em `missingStudents` (`services/attendance.ts`), `a.student_id = ${students.id}` comparava a presença com ela mesma, e todo aluno parecia sumido. A correção foi escrever `students.id` à mão no SQL. Com `join`, o Drizzle já qualifica e o problema some.
+
+### 19.4 Autenticação, sessão e permissões
+
+A regra de ouro do projeto: **quem protege é o servidor, nunca a tela.** Esconder um botão melhora a experiência; bloquear no servidor é o que impede o acesso.
+
+**Sessão** (`lib/auth/session.ts`). No login, o servidor sorteia um token, guarda só o hash dele na tabela `sessions` e manda o token num cookie `httpOnly` (o JavaScript da página não consegue ler). A cada página, `currentUser()` procura a sessão pelo hash e devolve o usuário com o nome da academia, o fuso, as permissões e se o e-mail foi confirmado. Por ler do banco a cada página, uma permissão alterada vale na hora.
+
+**Guardas** (`lib/auth/guards.ts`). Toda página e toda action começa com uma delas:
+
+1. `requireStudent()` para a área do aluno.
+2. `requirePlatformAdmin()` para a plataforma.
+3. `requireAcademyAdmin("<permissão>")` para a equipe da academia.
+
+A terceira faz quatro conferências em ordem: está logado? é da academia? a academia está ativa? tem a permissão pedida? Se falhar a última, a pessoa volta para `firstArea()`, a primeira área que ela pode usar, com um aviso. O valor especial `"full"` exige acesso total (só quem gerencia a equipe).
+
+**Permissões** (`lib/permissions.ts`). No banco, `users.permissions` é `null` (acesso total) ou uma lista como `["alunos", "pagamentos"]`. A função `can(permissoes, "financeiro")` responde sim ou não, e `hasFullAccess` diz se é `null`. Repare no tipo `Permission`: ele vem das chaves do objeto `PERMISSIONS` (`keyof typeof PERMISSIONS`). Ao criar uma permissão nova, o TypeScript passa a aceitar a chave em todo o código sem você declarar o tipo à mão.
+
+Onde a permissão é usada:
+
+- No servidor: o argumento de `requireAcademyAdmin` em cada `page.tsx`, `actions.ts` e `route.ts`.
+- No menu: `components/Shell.tsx` filtra os itens com `needs` e monta a barra do celular só com o que a pessoa usa.
+- Nos botões: `can(ctx.permissions, "pagamentos")` esconde o "Receber" de quem não registra pagamento.
+
+Duas regras de negócio para notar. Ninguém altera o próprio acesso (`updateUserPermissions` recusa), então sempre sobra alguém com acesso total. E "Dados de saúde" exige "Alunos": a regra está tanto no servidor (`permissionsFromForm`) quanto na tela (`PermissionPicker` marca as duas juntas).
+
+### 19.5 Funcionalidades, arquivo por arquivo
+
+Cada funcionalidade segue o mesmo desenho: um serviço com a regra, uma tela ou rota que o chama e um teste. A tabela está na ordem sugerida de estudo, da mais simples para a mais completa.
+
+| Funcionalidade | Versão | Arquivos principais | O que observar |
+| --- | --- | --- | --- |
+| Exportar CSV | 0.8 | `lib/csv.ts`, `app/(app)/mensalidades/exportar/route.ts` | Separador `;` e o BOM `\uFEFF` no início: é o que faz o Excel brasileiro abrir certo. |
+| Suspender academia | 0.8 | `services/users.ts` (`setAcademyActive`), `app/plataforma/page.tsx` | Transação com três passos e `ConfirmSubmit`, a janela de confirmação antes de enviar. |
+| Área do aluno | 0.8 | `app/aluno/page.tsx` | O `Map` que junta cada mensalidade com os pagamentos dela, e o componente `Membership` reaproveitado para dependentes. |
+| Telefone e senha do aluno | 0.8 | `app/aluno/conta/actions.ts`, `services/student-portal.ts` | `createSession` depois de trocar a senha: as outras sessões caem, a atual continua. |
+| Fuso por academia | 0.9 | `lib/dates.ts` (`today`, `todayIn`) | Datas de negócio são texto `AAAA-MM-DD` no fuso da academia, nunca `Date` em UTC. |
+| Pix copia e cola | 0.9 | `lib/pix.ts`, `lib/validation.ts` (`normalizePixKey`) | O formato EMV: cada campo é id + tamanho + valor, e o CRC16 no fim. Leia junto com o teste. |
+| Confirmação de e-mail | 0.9 | `services/email-verification.ts`, `app/confirmar-email/[token]/page.tsx` | Mesmo padrão da recuperação de senha: token sorteado, só o hash no banco, validade e uso único. |
+| Permissões da equipe | 0.9 | `lib/permissions.ts`, `lib/auth/guards.ts`, `app/(app)/configuracoes/Forms.tsx` | Ver 19.4. |
+| Relatórios | 0.10 | `services/reports.ts`, `app/(app)/relatorios/page.tsx` | Somas por mês feitas no banco; o gráfico é só CSS, com a altura da barra em porcentagem. |
+| Presença | 0.10 | `services/attendance.ts`, `app/(app)/presenca/` | Um formulário por linha, `revalidatePath` em vez de `redirect`, e a armadilha do `students.id`. |
+| Área do responsável | 0.10 | `services/guardian-access.ts` | `ownsOrGuards`: uma condição SQL só, reaproveitada na visão do aluno e no recibo. |
+| Tarefa diária | 0.10 | `services/automation.ts`, `app/api/tarefas/diarias/route.ts` | Grava o lembrete antes de enviar e apaga se o envio falhar: assim nunca sai em dobro nem se perde. |
+
+Três ideias aparecem em várias linhas e valem mais do que qualquer funcionalidade isolada:
+
+- **A regra mora no serviço.** A tela não decide nada sozinha; ela chama `services/...` e mostra o resultado. Por isso os testes testam os serviços.
+- **Tudo tem dono.** Toda consulta filtra por `academyId` do `ctx`. Uma academia nunca enxerga dado de outra, mesmo se alguém trocar um id na URL.
+- **Toda ação importante deixa rastro.** `audit(tx, ctx, ...)` grava quem fez o quê; quando é a tarefa automática, o `userId` é `null` e a auditoria mostra "Sistema".
+
+### 19.6 Segurança e operação
+
+Esta parte não tem tela, mas é a que mais conta numa entrevista: mostra que você pensou no sistema funcionando de verdade.
+
+**Cabeçalhos de segurança** (`next.config.ts`). A função `headers()` acrescenta cabeçalhos em toda resposta. Os principais:
+
+- `Content-Security-Policy`: o navegador só carrega scripts, estilos e imagens do próprio sistema. Por isso o QR Code é gerado no servidor como `data:` em vez de vir de um site externo.
+- `X-Frame-Options: DENY` e `frame-ancestors 'none'`: ninguém coloca o sistema dentro de um iframe para enganar o clique.
+- `Strict-Transport-Security`, só em produção: o navegador passa a usar sempre HTTPS.
+
+Repare na variável `production`: em desenvolvimento o Next precisa de `'unsafe-eval'` para o recarregamento rápido, e o código só libera isso fora de produção.
+
+**Segredo comparado em tempo constante** (`app/api/tarefas/diarias/route.ts`). O `CRON_SECRET` é comparado com `timingSafeEqual`, não com `===`. Com `===`, a comparação para no primeiro caractere diferente, e medir o tempo de resposta poderia revelar o segredo aos poucos.
+
+**Monitoramento** (`instrumentation.ts`). O Next chama `onRequestError` em todo erro do servidor. O código escreve uma linha JSON no log e, se houver `ERROR_WEBHOOK_URL`, manda um aviso curto. O `try/catch` em volta do `fetch` existe para que o aviso nunca derrube a resposta.
+
+**Backup** (`scripts/backup.sh` e o serviço `backup` no `docker-compose.yml`). Um `pg_dump` por dia, no formato compactado do PostgreSQL, apagando os arquivos mais velhos que `KEEP_DAYS`. O arquivo é gravado como `.tmp` e só depois renomeado: um backup interrompido no meio nunca parece completo.
+
+**Auditoria das exportações.** As rotas de CSV gravam na auditoria antes de montar o arquivo. Dados pessoais saindo do sistema é exatamente o que a LGPD pede para registrar.
+
+### 19.7 CSS e responsividade
+
+Todo o visual está em `app/globals.css`, sem framework. Três técnicas fazem o layout funcionar do celular ao computador.
+
+**Tokens de cor.** No topo, `:root` define variáveis como `--surface`, `--ink`, `--ok` e `--danger`. O resto do arquivo nunca escreve uma cor direto, só `var(--surface)`. O tema escuro inteiro é um bloco `@media (prefers-color-scheme: dark)` que redefine essas variáveis: nenhuma regra de componente muda. No fim desse bloco, a ficha e o recibo recebem os tokens claros de volta, para imprimir em papel branco.
+
+**Grid que se ajusta sozinho.** `grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))` (em `.perm-grid`) quer dizer "quantas colunas de pelo menos 240px couberem". No celular sai uma coluna, no computador três, sem nenhuma `@media`.
+
+**`@media` só onde o layout muda de natureza.** Os pontos de quebra usados são 480px (celular pequeno), 719/720px (celular × tablet) e 960px (computador). Exemplo: em `.pix`, abaixo de 560px o QR Code sai do lado e vai para cima, centralizado.
+
+Três detalhes pequenos que valem copiar:
+
+- **Toque de pelo menos 44px.** Botões e itens clicáveis têm `min-height: 44px`, o tamanho mínimo recomendado para o dedo.
+- **`:has()` para estado.** `.perm:has(input:checked)` pinta o cartão inteiro quando a caixa dentro dele está marcada, sem JavaScript.
+- **Texto que não estoura.** `min-width: 0` junto com `text-overflow: ellipsis` evita que um e-mail longo empurre a tela para o lado.
+
+Como a responsividade foi conferida: um script com Playwright abria cada tela em 390px e 1366px, tirava um print e testava `document.documentElement.scrollWidth > window.innerWidth`. Se fosse verdadeiro, havia rolagem horizontal, o defeito de responsividade mais comum.
+
+### 19.8 Testes desta parte
+
+O projeto tem testes de regra de negócio (Vitest, contra um PostgreSQL de verdade), um teste que lê o código e confere as guardas de todas as rotas (`tests/guardas.test.ts`) e testes de ponta a ponta (Playwright, clicando no navegador). Os arquivos têm nome de assunto, não de versão: para estudar uma funcionalidade, abra o arquivo do assunto dela.
+
+| Comando | O que roda | Quando usar |
+| --- | --- | --- |
+| `npm test` | Vitest, pasta `tests/` | Depois de mexer em qualquer serviço. Uns 40 segundos. |
+| `npx vitest run tests/automacao-e-presenca.test.ts` | Um arquivo só | Enquanto estuda uma funcionalidade. |
+| `npm run test:e2e` | Playwright, pasta `tests/e2e/` | Antes de entregar uma versão. Uns 2 minutos. |
+
+**Como um teste com banco é montado.** Veja `tests/area-do-aluno.test.ts`. `newAcademy()` (em `tests/helpers.ts`) cria uma academia nova a cada teste, então um teste nunca enxerga o dado do outro. O e-mail é trocado por `memoryMailer()`: os e-mails vão para uma lista em memória, e o teste confere `mail.sent` em vez de mandar e-mail de verdade.
+
+**Data fixa para não depender do dia.** Em `tests/automacao-e-presenca.test.ts`, a tarefa diária recebe `NOW = 2031-03-07 às 12h`. Sem isso, o teste do lembrete "3 dias antes" passaria num dia e falharia no outro. Foi exatamente o defeito do teste de pagamento parcial, corrigido na 0.10.
+
+**O teste instável que foi corrigido.** O de recuperação de senha (`tests/e2e/senha-e-recibo.spec.ts`) falhava às vezes na suíte completa. A causa: depois de clicar em "Esqueci minha senha", o teste preenchia `#email` sem esperar a página trocar. A tela de login também tem `#email` e um botão de enviar, então, com o servidor lento, o teste preenchia e enviava o formulário de login. A correção foi esperar a URL e o título da página nova antes de preencher.
+
+### 19.9 Exercícios práticos
+
+Do mais fácil ao mais difícil. Cada um mexe numa camada diferente; se o `npm test` continuar passando no fim, você entendeu.
+
+- [ ] **Coluna nova no CSV.** Acrescente "Modalidade" no CSV de mensalidades. Você vai precisar olhar o que `listFees` devolve e talvez acrescentar um `join`.
+- [ ] **Novo período nos relatórios.** Acrescente "24 meses" em `PERIODS`. Repare no que acontece com o gráfico no celular e ajuste o CSS se as barras apertarem.
+- [ ] **Quebre um teste de propósito.** Em `lib/pix.ts`, troque `"11"` por `"12"` no campo 01. Rode `npx vitest run tests/lib.test.ts` e leia a mensagem de erro com calma.
+- [ ] **Nova permissão.** Crie a permissão "relatorios", separada de "financeiro". Siga o caminho: `lib/permissions.ts`, a guarda da página, o item do menu em `Shell.tsx`. O TypeScript vai apontar o que faltar.
+- [ ] **Regra de negócio com teste.** Faça a presença recusar data no futuro também dentro de `setPresence` (hoje só a action confere). Escreva o teste antes da mudança e veja ele falhar primeiro.
+- [ ] **Migration sua.** Acrescente `notes` (observação opcional) na tabela `attendances`: schema, `drizzle-kit generate`, campo na tela de presença.
+- [ ] **Leia a correção do teste instável.** Em `tests/e2e/senha-e-recibo.spec.ts`, apague as duas linhas de espera depois do clique e rode a suíte algumas vezes. Explique com suas palavras por que ele passa a falhar de vez em quando.

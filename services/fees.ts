@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, ilike, lt, lte, ne, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { fees, payments, students } from "@/db/schema";
-import { dueDateFor, today } from "@/lib/dates";
+import { dueDateFor, todayIn } from "@/lib/dates";
 import { DomainError, NotFoundError } from "@/lib/errors";
 import { displayFeeStatus, type DisplayFeeStatus } from "@/lib/fee-status";
 import { formatMoney } from "@/lib/money";
@@ -99,7 +99,7 @@ export interface FeeFilters {
 }
 
 function feeConditions(ctx: AcademyContext, f: FeeFilters) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
   const statusFilter = {
     pending: and(eq(fees.status, "pending"), gte(fees.dueDate, now)),
     overdue: and(eq(fees.status, "pending"), lt(fees.dueDate, now)),
@@ -117,7 +117,7 @@ function feeConditions(ctx: AcademyContext, f: FeeFilters) {
 }
 
 export async function listFees(ctx: AcademyContext, f: FeeFilters = {}, limit = 200, offset = 0) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
   const rows = await db.select({
     id: fees.id, studentId: fees.studentId, studentName: students.name, studentPhone: students.phone, amountCents: fees.amountCents, dueDate: fees.dueDate,
     reference: fees.reference, status: fees.status, notes: fees.notes, paidCents: paidSum,
@@ -146,7 +146,7 @@ export async function getFee(ctx: AcademyContext, id: string) {
 }
 
 async function listFeesById(ctx: AcademyContext, id: string) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
   const rows = await db.select({
     id: fees.id, studentId: fees.studentId, studentName: students.name, amountCents: fees.amountCents, dueDate: fees.dueDate,
     reference: fees.reference, status: fees.status, notes: fees.notes, paidCents: paidSum,
@@ -158,11 +158,13 @@ async function listFeesById(ctx: AcademyContext, id: string) {
  * Gera as mensalidades de um período para todos os alunos ativos que ainda não têm.
  * Não é recorrência automática: só roda quando o administrador pede.
  */
-export async function generateMonthlyFees(ctx: AcademyContext, reference: string) {
+/** userId null = gerado pela tarefa diária (aparece como "Sistema" na auditoria). */
+export async function generateMonthlyFees(ctx: { academyId: string; userId: string | null }, reference: string, opts: { keepCanceled?: boolean } = {}) {
   return db.transaction(async (tx) => {
     const active = await tx.select().from(students).where(and(eq(students.academyId, ctx.academyId), eq(students.status, "active")));
     const existing = await tx.select({ studentId: fees.studentId }).from(fees)
-      .where(and(eq(fees.academyId, ctx.academyId), eq(fees.reference, reference), ne(fees.status, "canceled")));
+      // na geração automática, mensalidade cancelada pela academia conta como "já existe" (não volta sozinha)
+      .where(and(eq(fees.academyId, ctx.academyId), eq(fees.reference, reference), opts.keepCanceled ? undefined : ne(fees.status, "canceled")));
     const have = new Set(existing.map((e) => e.studentId));
     // alunos ativos sempre têm valor mensal (garantido por uma regra do banco)
     const toCreate = active.filter((s) => !have.has(s.id) && s.monthlyFeeCents !== null);
@@ -171,7 +173,7 @@ export async function generateMonthlyFees(ctx: AcademyContext, reference: string
         academyId: ctx.academyId, studentId: s.id, amountCents: s.monthlyFeeCents as number, dueDate: dueDateFor(reference, s.dueDay), reference,
       })));
     }
-    await audit(tx, ctx, "fee.generated", "fee", null, `${toCreate.length} mensalidade(s) geradas para ${reference}`, { reference, created: toCreate.length, skipped: have.size });
+    await audit(tx, ctx, "fee.generated", "fee", null, `${toCreate.length} mensalidade(s) geradas para ${reference}${ctx.userId ? "" : " (automático)"}`, { reference, created: toCreate.length, skipped: have.size });
     return { created: toCreate.length, skipped: active.length - toCreate.length };
   });
 }

@@ -1,13 +1,13 @@
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { fees, payments, students } from "@/db/schema";
-import { monthRange, today } from "@/lib/dates";
+import { monthRange, todayIn } from "@/lib/dates";
 import type { AcademyContext } from "./context";
 import { financeSummary } from "./finance";
 import { listFees } from "./fees";
 
 export async function dashboard(ctx: AcademyContext, reference: string) {
-  const now = today();
+  const now = todayIn(ctx.timezone);
   const { from, to } = monthRange(reference);
   const open = sql`${fees.amountCents} - coalesce((select sum(p.amount_cents) from ${payments} p where p.fee_id = fees.id and p.status = 'paid'), 0)`;
 

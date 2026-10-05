@@ -2,18 +2,30 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { fileURLToPath } from "node:url";
 
 // carrega o .env quando existir (fora do Docker); variáveis já definidas têm prioridade
-try { process.loadEnvFile(".env"); } catch { /* sem .env */ }
+try {
+  process.loadEnvFile(".env");
+} catch {
+  /* sem .env */
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL não configurada.");
   process.exit(1);
 }
+
 const client = postgres(url, { max: 1 });
+
 try {
-  await migrate(drizzle(client), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
+  const migrationsFolder = fileURLToPath(
+    new URL("../drizzle", import.meta.url),
+  );
+
+  await migrate(drizzle(client), { migrationsFolder });
+
   console.log("Migrations aplicadas.");
 } catch (error) {
   console.error("Falha nas migrations:", error.message);

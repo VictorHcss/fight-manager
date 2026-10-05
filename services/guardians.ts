@@ -36,7 +36,7 @@ export async function guardiansOf(ctx: AcademyContext, studentId: string) {
     id: guardians.id, name: guardians.name, cpf: guardians.cpf, phone: guardians.phone, email: guardians.email,
     zip: guardians.zip, street: guardians.street, number: guardians.number, complement: guardians.complement,
     district: guardians.district, city: guardians.city, state: guardians.state,
-    relationship: studentGuardians.relationship, isPrimary: studentGuardians.isPrimary,
+    relationship: studentGuardians.relationship, isPrimary: studentGuardians.isPrimary, userId: guardians.userId,
   }).from(studentGuardians).innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
     .where(and(eq(studentGuardians.studentId, studentId), eq(guardians.academyId, ctx.academyId)))
     .orderBy(sql`${studentGuardians.isPrimary} desc`, asc(guardians.name));

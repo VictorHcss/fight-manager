@@ -7,6 +7,7 @@ import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { db } from "@/db";
 import { academies, sessions, users } from "@/db/schema";
+import { isPermission, type Permission } from "@/lib/permissions";
 
 export const SESSION_COOKIE = "fm_session";
 const SESSION_DAYS = 7;
@@ -33,6 +34,9 @@ export interface SessionUser {
   role: "PLATFORM_ADMIN" | "ACADEMY_ADMIN" | "STUDENT";
   academyId: string | null;
   academyName: string | null;
+  academyTimezone: string | null;
+  permissions: Permission[] | null;
+  emailVerified: boolean;
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
@@ -40,6 +44,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   if (!token) return null;
   const [row] = await db.select({
     id: users.id, name: users.name, email: users.email, role: users.role, academyId: users.academyId, academyName: academies.name,
+    academyTimezone: academies.timezone, permissions: users.permissions, emailVerifiedAt: users.emailVerifiedAt,
   }).from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .leftJoin(academies, eq(academies.id, users.academyId))
@@ -47,7 +52,9 @@ export async function currentUser(): Promise<SessionUser | null> {
       eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date()), eq(users.active, true),
       sql`(${users.academyId} is null or ${academies.active} = true)`, // academia suspensa não entra
     ));
-  return row ?? null;
+  if (!row) return null;
+  const { emailVerifiedAt, permissions, ...rest } = row;
+  return { ...rest, permissions: permissions ? permissions.filter(isPermission) : null, emailVerified: !!emailVerifiedAt };
 }
 
 export async function destroySession() {

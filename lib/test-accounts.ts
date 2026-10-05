@@ -14,7 +14,9 @@ export interface TestAccount {
 
 export const TEST_ACCOUNTS: TestAccount[] = [
   { email: "admin@academia.dev", role: "ACADEMY_ADMIN", label: "Administrador da academia", description: "Painel completo: alunos, mensalidades, pagamentos e financeiro." },
+  { email: "recepcao@academia.dev", role: "ACADEMY_ADMIN", label: "Equipe com acesso personalizado", description: "Recepção: alunos, mensalidades, pagamentos e solicitações; sem financeiro nem saúde." },
   { email: "aluno@academia.dev", role: "STUDENT", label: "Aluno aprovado", description: "Área do aluno com mensalidades, pagamentos e recibos." },
+  { email: "responsavel@academia.dev", role: "STUDENT", label: "Responsável com acesso", description: "Mãe de dois alunos menores: vê situação, Pix e recibos dos dependentes." },
   { email: "pendente@academia.dev", role: "STUDENT", label: "Aluno aguardando aprovação", description: "Pediu para entrar pelo convite; aparece em Solicitações." },
   { email: "semacademia@academia.dev", role: "STUDENT", label: "Aluno sem academia", description: "Criou a conta sozinho; a academia pode adicioná-lo pelo e-mail." },
   { email: "plataforma@fightmanager.dev", role: "PLATFORM_ADMIN", label: "Administrador da plataforma", description: "Visão de todas as academias cadastradas." },

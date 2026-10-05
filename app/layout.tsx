@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: { default: "Fight Manager", template: "%s | Fight Manager" },
   description: "Gestão administrativa para academias de luta: alunos, mensalidades, pagamentos e financeiro.",
   robots: { index: false, follow: false }, // sistema interno: não aparece em buscadores
+  appleWebApp: { capable: true, title: "Fight Manager", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#17191f" };
